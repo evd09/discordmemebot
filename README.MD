@@ -34,8 +34,7 @@ Reddit API credentials (Client ID, Client Secret, User Agent)
 
 Docker (optional for containerized deployment)
 
-Python Dependencies
-
+Python Dependencies:
 discord.py
 asyncpraw
 python-dotenv
@@ -44,40 +43,50 @@ PyNaCl
 🔧 Setup & Configuration
 
 1. Clone the repository:
+```
 git clone https://github.com/evd09/memebot.git
+```
+```
 cd discord-meme-bot
+```
 
 2. **Environment variables**:
-
 Create a `.env` in the project root:
+```
 DISCORD_TOKEN=your_discord_bot_token
 APPLICATION_ID=your_discord_application_id
 GUILD_ID=your_test_guild_id
 REDDIT_CLIENT_ID=your_reddit_client_id
 REDDIT_CLIENT_SECRET=your_reddit_client_secret
 REDDIT_USER_AGENT=discord:meme.bot:v1 (by /u/YourRedditUsername)
-
+```
 3. Install dependencies:
+```
 pip install --no-cache-dir -r requirements.txt
-
+```
 4. **Run locally**:
+```
 python bot.py
-
+```
 🐳 Docker
 Build the image:
+```
 docker build -t discord-meme-bot .
-
+```
 Run the container:
+```
 docker run -it --env-file .env discord-meme-bot
-
+```
 Docker Tips
 Bind mounting: Persist stats.json and cache.db outside the container:
+```
 docker run -v /host/path/meme-data:/app -it --env-file .env discord-meme-bot
-
+```
 - **.dockerignore**: Exclude data files:
 ```ignore
 stats.json
 cache.db
+```
 
 ⚠️ Rate Limits & Best Practices
 
