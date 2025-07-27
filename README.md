@@ -1,2 +1,0 @@
-# memebot
-Discord Meme bot
