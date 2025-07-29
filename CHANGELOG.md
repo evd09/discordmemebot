@@ -1,52 +1,35 @@
 # Changelog
 
-All notable changes to this project will be documented in this file.
+Version 2.5
 
-## [Unreleased]
+1. Replaced print() Debugs with Structured Logging
+- Introduced a module‑level log = logging.getLogger(__name__) in both bot.py and cogs/meme.py.
+- Swapped all ad‑hoc print() calls for the appropriate log.debug(), log.info(), log.warning(), or log.error(..., exc_info=True) calls.
+- Configured the root logger in bot.py with logging.basicConfig(level=logging.INFO, …), so you can toggle verbosity globally without touching cog code.
 
-### Added
+2. Fixed Background Cache Pruning
+- Removed duplicate _prune_cache definitions and the old _do_prune_cache helper.
+- Kept a single, @tasks.loop(seconds=60)‑decorated _prune_cache method.
+- In __init__, initialized self.cache = {}, then simply called self._prune_cache.start().
+- Ensured self._prune_cache.cancel() in cog_unload().
 
-- New `/r_` command to fetch memes from a specific subreddit with optional keyword filtering.
-- User notification messages when Reddit API rate limits cause delays.
-- Exponential backoff and retry logic for Reddit API calls to improve reliability.
-- Enhanced media URL extraction supporting galleries, videos, `.gifv` conversion, and various media formats.
-- Cache management with automatic pruning to improve performance and reduce API calls.
-- `/topreactions` command to show the top 5 memes based on reaction counts.
-- Reaction tracking and storage for meme messages to support leaderboard features.
+3. Added Utility Commands
+- /help – A hybrid command that lists all available MemeBot commands in a neat embed, wrapped in a try/except to log any unexpected errors.
+- /ping – Reports the bot’s current Discord gateway latency in milliseconds.
+- /uptime – Calculates and displays how long the bot has been running since self.start_time.
 
-### Changed
+4. Disabled Default Help Command
+- Updated bot = commands.Bot(...) in bot.py to include help_command=None, which unregisters Discord.py’s built‑in help so your custom /help can register without conflict.
 
-- Updated meme fetching logic to respect API rate limits and avoid recently seen posts.
-- Improved error handling across all commands for better user feedback.
-- Commands now notify users when the bot is waiting due to Reddit API rate limits.
-- Added detailed debug logging for subreddit validation and meme fetching steps.
+5. Added /dashboard & HTTP Stats Endpoint
+- /dashboard – A new hybrid command that reads your existing stats.json and renders a Discord embed showing:
+	- Total memes served
+	- NSFW meme count
+	- Top 3 users by usage
+	- Top 3 subreddits by usage
+	- Top 3 keywords by count
+- HTTP /stats endpoint – A lightweight aiohttp server in bot.py serves stats.json at http://<your‑host>:8080/stats for external dashboards or integrations.
 
-### Fixed
-
-- Fixed indentation and syntax errors causing extension load failures.
-- Corrected command error handling to prevent crashes during API failures.
-
-### Removed
-
-- Deprecated old meme fetching methods without rate limit awareness.
-
-## File Structure Changes
-
-- `cogs/meme.py`:  
-  Contains the main Cog with all meme commands (`/meme`, `/nsfwmeme`, `/r_`, `/topreactions`), API rate limiting, reaction tracking, and caching logic.  
-  **Place this file inside the `cogs` folder.**
-
-- `bot.py`:  
-  Entry point for the bot, responsible for loading cogs and initializing the Discord bot client.
-
-- `meme_stats.py`:  
-  Helper module for reaction tracking and meme message registration (existing or new as per your setup).
-
-## Installation & Usage Notes
-
-- Ensure you have a `cogs` folder and place `meme.py` inside it.
-- Provide Reddit API credentials via environment variables:
-  - `REDDIT_CLIENT_ID`
-  - `REDDIT_CLIENT_SECRET`
-- Optionally maintain a `subreddits.json` file for custom subreddit lists.
-- The bot now respects Reddit API rate limits automatically and informs users of any delays.
+6. Cleanup & Consistency
+- Ensured every slash command follows the same pattern: @commands.hybrid_command, clear docstring, try/except with log.error(..., exc_info=True), and an ephemeral reply for errors.
+- Logged key milestones (e.g. cog initialization, subreddit list load, validation complete, dashboard generation) at INFO level.
