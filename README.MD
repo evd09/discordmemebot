@@ -75,8 +75,8 @@ discord-meme-bot/
 
 1. Clone the repository:
 ```bash
-   git clone https://github.com/evd09/discordmemebot.git
-   cd discord-meme-bot
+git clone https://github.com/evd09/discordmemebot.git
+cd discord-meme-bot
 ```
 2. **Environment variables**:
 Create a `.env` in the project root:
@@ -93,7 +93,15 @@ REDDIT_USER_AGENT=discord:meme.bot:v1 (by /u/YourRedditUsername)
 mkdir cogs
 mv meme.py cogs/
 ```
-
+4. Create stat.JSON
+```
+touch stats.json
+chmod 666 stats.json  # (optional, for write permission)
+```
+(Optional) Add {} inside if you want:
+```
+echo "{}" > stats.json
+```
 ### Running locally: ###
 1. Install dependencies:
 ```
@@ -129,6 +137,71 @@ docker run -v /host/path/meme-data:/app -it --env-file .env discord-meme-bot
 stats.json
 cache.db
 ```
+---
+## 📝 How to Add More Subreddits to `subreddits.json`
+1. **Locate the `subreddits.json` file**
+   - On your host machine (outside Docker), find the `subreddits.json` file in your project directory.  
+     ```
+     ls -l subreddits.json
+     ```
+2. **Open the file in a text editor**
+   - Use your preferred editor (VSCode, nano, vim, etc):
+     ```
+     nano subreddits.json
+     ```
+     or  
+     ```
+     code subreddits.json
+     ```
+3. **Edit the lists**
+   - Inside, you'll see a structure like this:
+     ```json
+     {
+       "sfw": [
+         "memes", "dankmemes", "wholesomememes", "me_irl", "funny"
+       ],
+       "nsfw": [
+         "nsfwmemes", "sexymemes", "rule34memes"
+       ]
+     }
+     ```
+   - **Add or remove subreddit names** (as strings) inside the `"sfw"` or `"nsfw"` lists.  
+     Example: Add `"historymemes"` to SFW, and `"spicymemes"` to NSFW.
+     ```json
+     {
+       "sfw": [
+         "memes", "dankmemes", "wholesomememes", "me_irl", "funny", "historymemes"
+       ],
+       "nsfw": [
+         "nsfwmemes", "sexymemes", "rule34memes", "spicymemes"
+       ]
+     }
+     ```
+   - **Tip:** Each subreddit should be in quotes, separated by commas.
+4. **Save the file**
+   - If using `nano`, press `Ctrl+O` to write, then `Enter`, and `Ctrl+X` to exit.
+5. **(If using Docker) Make sure the file is mounted into your container**
+   - Your `docker-compose.yml` or `docker run` command should have:
+     ```
+     - ./subreddits.json:/app/subreddits.json
+     ```
+   - This ensures changes on the host are seen inside the running container.
+6. **Reload subreddits in the bot**
+   - Use the `/reloadsubreddits` command in your Discord server **OR** restart your bot for the changes to take effect.
+     ```
+     /reloadsubreddits
+     ```
+   - The bot should reply with the updated validation info.
+7. **Verify**
+   - Try `/meme` or `/nsfwmeme` with your new subreddits/keywords to check!
+---
+
+### ⚠️ Important Notes
+- Double-check your JSON formatting! A single missing comma or quote will break loading.
+- Only add public, active subreddits. NSFW subs **must** go in `"nsfw"`, SFW in `"sfw"`.
+- If the bot reports a problem loading or validating, check your `subreddits.json` for typos or formatting errors.
+
+That’s it! You can now easily expand your meme sources any time. 🎉
 ---
 ## ⚠️ Rate Limits & Best Practices ##
 - Reddit API rate limit: ~60 requests/minute (varies). The bot enforces smart throttling with user notifications.
