@@ -5,6 +5,7 @@ services:
     env_file: .env
     restart: unless-stopped
     volumes:
+      - ./subreddits.json:/app/subreddits.json
       - ./stats.json:/app/stats.json  # (Optional) Persist stats
       - ./cache.db:/app/cache.db      # (Optional) Persist cache
     # Add other options you need (ports, etc)
