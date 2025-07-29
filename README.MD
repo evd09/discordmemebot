@@ -51,6 +51,25 @@ discord-meme-bot/
 - PyNaCl
 
 ---
+## Discord Bot Permissions: ##
+### Recommended Bot Permissions: ###
+| Permission                      | Purpose                                                |
+| ------------------------------- | ------------------------------------------------------ |
+| **Send Messages**               | To post memes and replies in channels                  |
+| **Embed Links**                 | To send rich embeds (titles, images, video thumbnails) |
+| **Read Message History**        | To access message context if needed                    |
+| **Use Slash Commands**          | To allow slash command invocation                      |
+| **Add Reactions**               | To add emoji reactions for meme voting or feedback     |
+| **Read Messages/View Channels** | To access messages and channels where it’s used        |
+
+### Optional (based on features): ###
+| Permission                     | Purpose                                                                            |
+| ------------------------------ | ---------------------------------------------------------------------------------- |
+| **Manage Messages**            | To delete or manage memes/messages if you implement moderation or cleanup features |
+| **Manage Emojis and Stickers** | If you want to add custom reactions or emojis                                      |
+| **Send TTS Messages**          | If your bot uses text-to-speech features                                           |
+
+---
 
 ## 🔧 Setup & Configuration ##
 
@@ -69,33 +88,37 @@ REDDIT_CLIENT_ID=your_reddit_client_id
 REDDIT_CLIENT_SECRET=your_reddit_client_secret
 REDDIT_USER_AGENT=discord:meme.bot:v1 (by /u/YourRedditUsername)
 ```
-3. Install dependencies:
+3. Create cogs directory and move meme.py to cogs/
+```
+mkdir cogs
+mv meme.py cogs/
+```
+
+### Running locally: ###
+1. Install dependencies:
 ```
 pip install --no-cache-dir -r requirements.txt
 ```
-4. **Run locally**:
+2. Run the bot:
 ```
 python bot.py
 ```
 ## 🐳 Docker ##
-Build the image:
+1. Build the image:
 ```
 docker build -t discord-meme-bot .
 ```
-Run the container Basic interactive run with environment variables:
+2. Run the container Basic interactive run with environment variables:
 ```
 docker run -it --env-file .env discord-meme-bot
 ```
-
 ### OR ###
-
-## Docker Compose ##
+## 🐳 Docker Compose ##
 1. Place your .env file in the same directory as docker-compose.yml.
 2. Run in the directory of docker-compose.yml
 ```
 docker-compose up -d
 ```
-
 ### Docker Tips ###
 Bind mounting: Persist stats.json and cache.db outside the container:
 ```
@@ -106,7 +129,7 @@ docker run -v /host/path/meme-data:/app -it --env-file .env discord-meme-bot
 stats.json
 cache.db
 ```
-
+---
 ## ⚠️ Rate Limits & Best Practices ##
 - Reddit API rate limit: ~60 requests/minute (varies). The bot enforces smart throttling with user notifications.
 - Default searches scan 50 posts per subreddit to avoid rate limits.
@@ -119,9 +142,9 @@ cache.db
 |:--------------------------|:---------------------------------------------------------------------|
 | /meme <keyword>           | Fetch a SFW meme by keyword or emoji                                 |
 | /nsfwmeme <kw>            | Fetch a NSFW meme (NSFW channel required)                            |
-| /r_ <subreddit> [keyword] | Fetch meme from a specific subreddit, optionally filtered by keyword | 
+| /r_ <subreddit> [keyword] | Fetch meme from a specific subreddit, optionally filtered by keyword |
 | /topreactions             | Show top 5 memes by reaction counts                                  |
-| /ping                     | Health check (bot alive)                                             |  
+| /ping                     | Health check (bot alive)                                             |
 | /listsubreddits           | List loaded SFW & NSFW subreddit sources                             |
 | /memestats                | Show total memes, NSFW ratio, top keyword                            |
 | /topusers                 | Leaderboard of top meme requesters                                   |
