@@ -87,9 +87,9 @@ Run the container Basic interactive run with environment variables:
 docker run -it --env-file .env discord-meme-bot
 ```
 
-###OR###
+### OR ###
 
-##Docker Compose##
+## Docker Compose ##
 1. Place your .env file in the same directory as docker-compose.yml.
 2. Run in the directory of docker-compose.yml
 ```
