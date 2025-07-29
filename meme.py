@@ -4,8 +4,12 @@ import random
 import asyncio
 import json
 import time
+import logging
+import json
+from datetime import datetime
 from typing import Dict, List, Optional
 from collections import deque, defaultdict
+from asyncprawcore import NotFound
 
 import asyncpraw
 import discord
@@ -14,13 +18,16 @@ from discord.ext import commands, tasks
 
 from meme_stats import stats, update_stats, register_meme_message, meme_msgs, track_reaction
 
-# Reaction tracking for /topreactions
-reaction_counts = defaultdict(int)         # {msg_id: reaction_count}
-meme_message_links = dict()                # {msg_id: (guild_id, channel_id, message_id, reddit_url)}
+# Set up logger
+log = logging.getLogger(__name__)
 
-# How long to remember which memes we've sent (in seconds)
+# Reaction tracking for /topreactions
+reaction_counts = defaultdict(int)
+meme_message_links = {}
+
+# How long to remember which memes we've sent
 CACHE_DURATION = 300
-# Valid media extensions for embedding
+# Valid media extensions
 MEDIA_EXTENSIONS = ('.jpg', '.jpeg', '.png', '.gif', '.mp4', '.webm')
 
 class Meme(commands.Cog):
@@ -28,14 +35,17 @@ class Meme(commands.Cog):
     Cog for fetching memes, validating subreddit lists, and providing meme-related commands.
     """
     def __init__(self, bot: commands.Bot):
+        self.start_time = time.time()
         self.recent_ids = deque(maxlen=200)
-        self._last_api_call = time.time()
-        self._min_interval = 1/50
         self._api_lock = asyncio.Lock()
         self.api_calls = 0
         self.api_reset_time = time.time() + 60
-
         self.bot = bot
+        log.info(
+            "MemeBot cog initialized at %s",
+            time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(self.start_time))
+        )
+
         self.reddit = asyncpraw.Reddit(
             client_id=os.getenv("REDDIT_CLIENT_ID"),
             client_secret=os.getenv("REDDIT_CLIENT_SECRET"),
@@ -48,8 +58,9 @@ class Meme(commands.Cog):
                 "sfw": data.get("sfw", []),
                 "nsfw": data.get("nsfw", [])
             }
-        except Exception as e:
-            print(f"[ERROR] Failed to load subreddits.json: {e}")
+            log.info("Loaded subreddits.json successfully.")
+        except Exception:
+            log.error("Failed to load subreddits.json", exc_info=True)
             self.subreddits = {
                 "sfw": [
                     "memes", "wholesomememes", "dankmemes", "funny",
@@ -61,12 +72,23 @@ class Meme(commands.Cog):
                 ]
             }
         self.cache: Dict[str, List[Dict[str, float]]] = {}
+        # Start the background prune task
         self._prune_cache.start()
         self.bot.loop.create_task(self.validate_subreddits())
 
     def cog_unload(self) -> None:
         self._prune_cache.cancel()
-    
+
+    @tasks.loop(seconds=60)
+    async def _prune_cache(self):
+        """Periodically prune the in-memory cache of seen posts."""
+        now = asyncio.get_event_loop().time()
+        for key, entries in list(self.cache.items()):
+            self.cache[key] = [
+                e for e in entries
+                if now - e.get("time", 0) < CACHE_DURATION
+            ]
+
     def reload_subreddits_from_file(self):
         try:
             with open("subreddits.json", "r") as f:
@@ -75,10 +97,10 @@ class Meme(commands.Cog):
                 "sfw": data.get("sfw", []),
                 "nsfw": data.get("nsfw", [])
             }
-            print("[INFO] Reloaded subreddits.json successfully.")
+            log.info("Reloaded subreddits.json successfully.")
             return True
         except Exception as e:
-            print(f"[ERROR] Failed to reload subreddits.json: {e}")
+            log.error("Failed to reload subreddits.json", exc_info=True)
             return False
 
     @tasks.loop(seconds=60)
@@ -99,24 +121,24 @@ class Meme(commands.Cog):
 
                     if self.api_calls >= 50:
                         wait = self.api_reset_time - now
-                        print(f"[INFO] API rate limit reached, sleeping for {wait:.2f}s")
+                        log.info("API rate limit reached, sleeping for %.2f seconds", wait)
                         if notify_wait:
-                            await notify_wait(wait)  # Notify user of wait time
+                            await notify_wait(wait)
                         await asyncio.sleep(wait)
                         self.api_calls = 0
                         self.api_reset_time = time.time() + 60
 
                     self.api_calls += 1
                     self._last_api_call = time.time()
-                break  # success, exit the retry loop
+                break
             except Exception as e:
                 retries += 1
-                print(f"[WARNING] API call failed: {e} (retry {retries}/{max_retries})")
+                log.warning("API call failed (retry %d/%d): %s", retries, max_retries, e)
                 if retries >= max_retries:
-                    print("[ERROR] Max retries reached, raising exception")
+                    log.error("Max API retries reached", exc_info=True)
                     raise
                 backoff = 2 ** retries
-                print(f"[INFO] Backing off for {backoff}s before retrying...")
+                log.info("Backing off for %d seconds before retrying", backoff)
                 await asyncio.sleep(backoff)
 
     def get_media_url(self, submission) -> Optional[str]:
@@ -170,56 +192,52 @@ class Meme(commands.Cog):
                 report[cat].append((sub, status, time.time() - t0))
         self.subreddits = {cat: [s for s, st, _ in report[cat] if st == "✅"] for cat in report}
         total = time.time() - start
-        print(f"🔄 Subreddit validation complete in {total:.2f}s")
+        log.info("Subreddit validation complete in %.2fs", total)
         return report, total
 
     async def fetch_meme(self, category: str, keyword: Optional[str] = None, notify_wait=None):
         subs = self.subreddits.get(category, [])
-        print(f"[DEBUG] fetch_meme: category={category}, keyword={keyword}, subs={subs}")
+        log.debug("fetch_meme: category=%s, keyword=%s, subs=%s", category, keyword, subs)
         if not subs:
-            print("[DEBUG] No subs available for category")
+            log.warning("No subreddits available for category '%s'", category)
             return None
 
         sub_name = random.choice(subs)
         try:
-            await self._throttle_api(notify_wait=notify_wait)  # pass notify_wait here
+            await self._throttle_api(notify_wait=notify_wait)
             subreddit = await self.reddit.subreddit(sub_name, fetch=True)
-            print(f"[DEBUG] Picked subreddit: {sub_name}")
-        except Exception as e:
-            print(f"[ERROR] Could not fetch subreddit '{sub_name}': {e}")
+            log.debug("Picked subreddit: %s", sub_name)
+        except Exception:
+            log.error("Could not fetch subreddit '%s'", sub_name, exc_info=True)
             return None
 
-        await self._throttle_api(notify_wait=notify_wait)  # and here before fetching posts
+        await self._throttle_api(notify_wait=notify_wait)
         posts = [p async for p in subreddit.hot(limit=50) if not p.stickied]
-        print(f"[DEBUG] Pulled {len(posts)} hot posts from r/{sub_name}")
+        log.debug("Pulled %d hot posts from r/%s", len(posts), sub_name)
 
         posts = [p for p in posts if self.get_media_url(p)]
-        print(f"[DEBUG] {len(posts)} posts have valid media")
+        log.debug("%d posts have valid media", len(posts))
 
         fallback = False
-        filtered_posts = posts
         if keyword:
             kw = keyword.lower()
-            filtered = [
-                p for p in posts
-                if kw in (p.title or '').lower() or kw in (str(p.url).lower() if p.url else '')
-            ]
-            print(f"[DEBUG] {len(filtered)} posts after keyword filter for '{keyword}'")
+            filtered = [p for p in posts if kw in (p.title or '').lower() or kw in (p.url or '').lower()]
+            log.debug("%d posts after keyword filter for '%s'", len(filtered), keyword)
             if filtered:
-                filtered_posts = filtered
+                posts = filtered
             else:
                 fallback = True
-        if not filtered_posts:
-            print("[DEBUG] No posts left after filtering")
+        if not posts:
+            log.info("No posts left after filtering for '%s'", keyword)
             return None
 
-        fresh = [p for p in filtered_posts if p.id not in self.recent_ids]
-        print(f"[DEBUG] {len(fresh)} fresh (not recently seen) posts")
-        chosen = random.choice(fresh if fresh else filtered_posts)
+        fresh = [p for p in posts if p.id not in self.recent_ids]
+        log.debug("%d fresh posts (not recently seen)", len(fresh))
+        chosen = random.choice(fresh if fresh else posts)
         self.recent_ids.append(chosen.id)
         if fallback:
             setattr(chosen, 'fallback', True)
-        print(f"[DEBUG] Chosen post: {chosen.title} (id: {chosen.id})")
+        log.info("Chosen post: %s (id=%s)", chosen.title, chosen.id)
         return chosen
 
     @commands.Cog.listener()
@@ -227,6 +245,7 @@ class Meme(commands.Cog):
         msg = reaction.message
         if str(msg.id) in meme_msgs:
             await track_reaction(msg.id, user.id, str(reaction.emoji))
+            log.debug("Tracked reaction %s on message %s by user %s", reaction.emoji, msg.id, user.id)
 
     @commands.hybrid_command(name="meme", description="Fetch a SFW meme")
     async def meme(self, ctx, keyword: Optional[str] = None):
@@ -235,50 +254,46 @@ class Meme(commands.Cog):
                 f"⚠️ Bot is rate-limited by Reddit API. Waiting for {wait_seconds:.1f}s before continuing...",
                 ephemeral=True
             )
+
         try:
             await ctx.defer()
-            post = await self.fetch_meme('sfw', keyword, notify_wait=notify_wait)
-            if not post:
+            chosen = await self.fetch_meme('sfw', keyword, notify_wait=notify_wait)
+            if not chosen:
                 return await ctx.reply("😔 Couldn't find any memes.", ephemeral=True)
-            if getattr(post, 'fallback', False):
-                await ctx.send(f"❌ Couldn't find memes for `{keyword}`, here's a random one!")
-            media_url = self.get_media_url(post)
-            print(f"[DEBUG] Media URL: {media_url}")
 
+            media_url = self.get_media_url(chosen)
+            log.debug("Media URL: %s", media_url)
+
+            embed = Embed(title=chosen.title, url=f"https://reddit.com{chosen.permalink}")
             if media_url and (
-                media_url.lower().endswith(('.mp4', '.webm', '.gif')) or "v.redd.it" in media_url
+                media_url.lower().endswith(('.mp4', '.webm', '.gif'))
+                or "v.redd.it" in media_url
             ):
-                thumb_url = self.get_video_thumbnail(post)
-                embed = Embed(
-                    title=post.title,
-                    url=f"https://reddit.com{post.permalink}"
-                )
-                if thumb_url:
-                    embed.set_image(url=thumb_url)
+                thumb = self.get_video_thumbnail(chosen)
+                if thumb:
+                    embed.set_image(url=thumb)
                 embed.add_field(name="Video Link", value=media_url, inline=False)
-                embed.set_footer(text=f"r/{post.subreddit.display_name}")
-                msg = await ctx.send(embed=embed)
             else:
-                embed = Embed(
-                    title=post.title,
-                    url=f"https://reddit.com{post.permalink}"
-                )
                 embed.set_image(url=media_url)
-                embed.set_footer(text=f"r/{post.subreddit.display_name}")
-                msg = await ctx.send(embed=embed)
-            print("[DEBUG] register_meme_message called, saving stats:", stats)
+
+            embed.set_footer(text=f"r/{chosen.subreddit.display_name}")
+
+            msg = await ctx.send(embed=embed)
             await register_meme_message(
                 msg.id,
                 ctx.channel.id,
                 ctx.guild.id,
-                f"https://reddit.com{post.permalink}",
-                post.title
+                f"https://reddit.com{chosen.permalink}",
+                chosen.title
             )
-            update_stats(ctx.author.id, keyword or '', post.subreddit.display_name, nsfw=False)  # or True for NSFW
-        except Exception as e:
-            print(f"[ERROR] /meme command error: {e}")
-            await ctx.reply("❌ Something went wrong while fetching memes.", ephemeral=True)
+            update_stats(ctx.author.id, keyword or '', chosen.subreddit.display_name, nsfw=False)
 
+        except Exception:
+            log.error("meme command error", exc_info=True)
+            await ctx.reply(
+                "❌ Oops! We ran into an issue fetching memes. Please let the admin know so they can take a look.",
+                ephemeral=True
+            )
 
     @commands.hybrid_command(name="nsfwmeme", description="Fetch a NSFW meme (NSFW channels only)")
     async def nsfwmeme(self, ctx, keyword: Optional[str] = None):
@@ -287,110 +302,34 @@ class Meme(commands.Cog):
                 f"⚠️ Bot is rate-limited by Reddit API. Waiting for {wait_seconds:.1f}s before continuing...",
                 ephemeral=True
             )
+
         try:
             if not ctx.channel.is_nsfw():
                 return await ctx.reply("🔞 You can only use NSFW memes in NSFW channels.", ephemeral=True)
+
             await ctx.defer()
-            post = await self.fetch_meme('nsfw', keyword, notify_wait=notify_wait)
-            if not post:
+            chosen = await self.fetch_meme('nsfw', keyword, notify_wait=notify_wait)
+            if not chosen:
                 return await ctx.reply("😔 Couldn't find any NSFW memes.", ephemeral=True)
-            if getattr(post, 'fallback', False):
-                await ctx.send(f"❌ Couldn't find NSFW memes for `{keyword}`, here's a random one!")
-            media_url = self.get_media_url(post)
-            print(f"[DEBUG] Media URL: {media_url}")
 
-            if media_url and (
-                media_url.lower().endswith(('.mp4', '.webm', '.gif')) or "v.redd.it" in media_url
-            ):
-                thumb_url = self.get_video_thumbnail(post)
-                embed = Embed(
-                    title=post.title,
-                    url=f"https://reddit.com{post.permalink}"
-                )
-                if thumb_url:
-                    embed.set_image(url=thumb_url)
-                embed.add_field(name="Video Link", value=media_url, inline=False)
-                embed.set_footer(text=f"r/{post.subreddit.display_name}")
-                msg = await ctx.send(embed=embed)
-            else:
-                embed = Embed(
-                    title=post.title,
-                    url=f"https://reddit.com{post.permalink}"
-                )
-                embed.set_image(url=media_url)
-                embed.set_footer(text=f"r/{post.subreddit.display_name}")
-                msg = await ctx.send(embed=embed)
-
-            await register_meme_message(
-                msg.id,
-                ctx.channel.id,
-                ctx.guild.id,
-                f"https://reddit.com{post.permalink}",
-                post.title
-            )
-            update_stats(ctx.author.id, keyword or '', post.subreddit.display_name, nsfw=True)  # or True for NSFW
-        except Exception as e:
-            print(f"[ERROR] /nsfwmeme command error: {e}")
-            await ctx.reply("❌ Something went wrong while fetching NSFW memes.", ephemeral=True)
-
-
-    @commands.hybrid_command(name="r_", description="Fetch a meme from a specific subreddit")
-    async def r_(self, ctx, subreddit: str, keyword: Optional[str] = None):
-        async def notify_wait(wait_seconds):
-            await ctx.send(
-                f"⚠️ Bot is rate-limited by Reddit API. Waiting for {wait_seconds:.1f}s before continuing...",
-                ephemeral=True
-            )
-        try:
-            await ctx.defer()
-            try:
-                sub = await self.reddit.subreddit(subreddit, fetch=True)
-            except Exception:
-                return await ctx.reply(f"❌ Could not find subreddit `{subreddit}`.", ephemeral=True)
-            await self._throttle_api(notify_wait=notify_wait)  # Add rate-limit notification before fetching posts
-            posts = [p async for p in sub.hot(limit=50) if not p.stickied]
-            posts = [p for p in posts if self.get_media_url(p)]
-            if not posts:
-                return await ctx.reply("😔 No media posts found.", ephemeral=True)
-            fallback = False
-            if keyword:
-                kw = keyword.lower()
-                filtered = [
-                    p for p in posts
-                    if kw in (p.title or '').lower() or kw in (str(p.url).lower() if p.url else '')
-                ]
-                if filtered:
-                    posts = filtered
-                else:
-                    fallback = True
-            chosen = random.choice(posts)
-            if fallback:
-                await ctx.send(f"❌ Couldn't find any posts for `{keyword}`, here's a random one!")
             media_url = self.get_media_url(chosen)
-            print(f"[DEBUG] Media URL: {media_url}")
+            log.debug("Media URL: %s", media_url)
 
+            embed = Embed(title=chosen.title, url=f"https://reddit.com{chosen.permalink}")
             if media_url and (
-                media_url.lower().endswith(('.mp4', '.webm', '.gif')) or "v.redd.it" in media_url
+                media_url.lower().endswith(('.mp4', '.webm', '.gif'))
+                or "v.redd.it" in media_url
             ):
-                thumb_url = self.get_video_thumbnail(chosen)
-                embed = Embed(
-                    title=chosen.title,
-                    url=f"https://reddit.com{chosen.permalink}"
-                )
-                if thumb_url:
-                    embed.set_image(url=thumb_url)
+                thumb = self.get_video_thumbnail(chosen)
+                if thumb:
+                    embed.set_image(url=thumb)
                 embed.add_field(name="Video Link", value=media_url, inline=False)
-                embed.set_footer(text=f"r/{chosen.subreddit.display_name}")
-                msg = await ctx.send(embed=embed)
             else:
-                embed = Embed(
-                    title=chosen.title,
-                    url=f"https://reddit.com{chosen.permalink}"
-                )
                 embed.set_image(url=media_url)
-                embed.set_footer(text=f"r/{chosen.subreddit.display_name}")
-                msg = await ctx.send(embed=embed)
 
+            embed.set_footer(text=f"r/{chosen.subreddit.display_name}")
+
+            msg = await ctx.send(embed=embed)
             await register_meme_message(
                 msg.id,
                 ctx.channel.id,
@@ -398,15 +337,105 @@ class Meme(commands.Cog):
                 f"https://reddit.com{chosen.permalink}",
                 chosen.title
             )
-            update_stats(ctx.author.id, keyword or '', post.subreddit.display_name, nsfw=False)  # or True for NSFW
-        except Exception as e:
-            print(f"[ERROR] /r_ command error: {e}")
-            await ctx.reply("❌ Something went wrong while fetching memes from that subreddit.", ephemeral=True)
+            update_stats(ctx.author.id, keyword or '', chosen.subreddit.display_name, nsfw=True)
+
+        except Exception:
+            log.error("nsfwmeme command error", exc_info=True)
+            await ctx.reply(
+                "❌ Oops! We ran into an issue fetching NSFW memes. Please let the admin know so they can take a look.",
+                ephemeral=True
+            )
+
+    @commands.hybrid_command(name="r_", description="Fetch a meme from a specific subreddit")
+    async def r_(self, ctx, subreddit: str, keyword: Optional[str] = None):
+        """Fetch a meme from a given subreddit, with optional keyword filtering and fallback."""
+        async def notify_wait(wait_seconds):
+            await ctx.send(
+                f"⚠️ Bot is rate-limited by Reddit API. Waiting for {wait_seconds:.1f}s before continuing...",
+                ephemeral=True
+            )
+
+        try:
+            await ctx.defer()
+
+            # Validate subreddit
+            try:
+                sub = await self.reddit.subreddit(subreddit, fetch=True)
+            except NotFound:
+                return await ctx.reply(f"❌ Could not find subreddit `{subreddit}`.", ephemeral=True)
+
+            # Throttle if needed
+            await self._throttle_api(notify_wait=notify_wait)
+
+            # Pull posts
+            posts = [
+                p async for p in sub.hot(limit=50)
+                if not p.stickied and self.get_media_url(p)
+            ]
+            if not posts:
+                return await ctx.reply("😔 No media posts found.", ephemeral=True)
+
+            # Keyword filter
+            fallback = False
+            if keyword:
+                kw = keyword.lower()
+                filtered = [p for p in posts if kw in (p.title or "").lower() or kw in (p.url or "").lower()]
+                if filtered:
+                    posts = filtered
+                else:
+                    fallback = True
+
+            # Choose one
+            chosen = random.choice(posts)
+            media_url = self.get_media_url(chosen)
+
+            if fallback:
+                await ctx.send(f"❌ Couldn't find any posts for `{keyword}`, here's a random one!")
+
+            # Build embed
+            embed = Embed(
+                title=chosen.title,
+                url=f"https://reddit.com{chosen.permalink}"
+            )
+            if media_url and (
+                media_url.lower().endswith((".mp4", ".webm", ".gif")) or "v.redd.it" in media_url
+            ):
+                thumb = self.get_video_thumbnail(chosen)
+                if thumb:
+                    embed.set_image(url=thumb)
+                embed.add_field(name="Video Link", value=media_url, inline=False)
+            else:
+                embed.set_image(url=media_url)
+
+            embed.set_footer(text=f"r/{chosen.subreddit.display_name}")
+
+            # Send + register
+            msg = await ctx.send(embed=embed)
+            await register_meme_message(
+                msg.id,
+                ctx.channel.id,
+                ctx.guild.id,
+                f"https://reddit.com{chosen.permalink}",
+                chosen.title
+            )
+            update_stats(
+                ctx.author.id,
+                keyword or "",
+                chosen.subreddit.display_name,
+                nsfw=False
+            )
+
+        except Exception:
+            log.error("r_ command error", exc_info=True)
+            await ctx.reply(
+                "❌ Oops! We ran into an issue fetching from that subreddit. Please let the admin know so they can take a look.",
+                ephemeral=True
+            )
 
     @commands.hybrid_command(name="reloadsubreddits", description="Reload and validate subreddit lists")
     async def reloadsubreddits(self, ctx: commands.Context):
         await ctx.defer(ephemeral=True)
-        # 1. Read from disk FIRST
+        # 1. Read from disk
         try:
             with open("subreddits.json", "r") as f:
                 data = json.load(f)
@@ -414,10 +443,13 @@ class Meme(commands.Cog):
                 "sfw": data.get("sfw", []),
                 "nsfw": data.get("nsfw", [])
             }
-        except Exception as e:
-            return await ctx.send(f"❌ Failed to reload subreddits.json from disk: {e}", ephemeral=True)
-
-        # 2. Then validate
+            log.info("Reloaded subreddits.json from disk")
+        except Exception:
+            log.error("Failed to reload subreddits.json from disk", exc_info=True)
+            return await ctx.send(
+                "❌ Failed to reload subreddits.json from disk. Please check logs.",
+                ephemeral=True
+            )
         try:
             report, total = await self.validate_subreddits()
             lines: List[str] = []
@@ -427,30 +459,28 @@ class Meme(commands.Cog):
                 lines.append(f"**{cat.upper()}** ({total_valid}/{total_checked} valid):")
                 for name, status, dt in report[cat]:
                     lines.append(f"{status} {name:15} — {dt:.2f}s")
-            lines.append(f"**Total:** {total:.2f}s")
+            lines.append(f"**Total validation time:** {total:.2f}s")
             await ctx.send("\n".join(lines), ephemeral=True)
+
             sfw_valid = sum(1 for _, status, _ in report['sfw'] if status == "✅")
-            sfw_total = len(report['sfw'])
             nsfw_valid = sum(1 for _, status, _ in report['nsfw'] if status == "✅")
-            nsfw_total = len(report['nsfw'])
             await ctx.send(
                 f"✅ Subreddit lists reloaded and tested! "
-                f"({sfw_valid}/{sfw_total} SFW, {nsfw_valid}/{nsfw_total} NSFW)", ephemeral=True
+                f"({sfw_valid}/{len(report['sfw'])} SFW, {nsfw_valid}/{len(report['nsfw'])} NSFW)",
+                ephemeral=True
             )
-        except Exception as e:
-            await ctx.send("❌ There was an error reloading subreddits.", ephemeral=True)
-   
+        except Exception:
+            log.error("Error during subreddit validation", exc_info=True)
+            await ctx.send(
+                "❌ There was an error validating subreddit lists. Please check logs.",
+                ephemeral=True
+            )
+
     @commands.hybrid_command(name="topreactions", description="Show top 5 memes by reactions")
     async def topreactions(self, ctx):
-
         if not meme_msgs:
             return await ctx.reply("No memes have been posted yet!", ephemeral=True)
 
-        # Print all meme_msgs and their reactions for debug
-        for msg_id, meta in meme_msgs.items():
-            pass
-
-        # Sort meme_msgs by the total number of reactions
         top = sorted(
             meme_msgs.items(),
             key=lambda x: sum(x[1].get("reactions", {}).values()),
@@ -470,7 +500,53 @@ class Meme(commands.Cog):
             msg_url = f"https://discord.com/channels/{guild_id}/{channel_id}/{msg_id}"
             lines.append(f"[Reddit Post]({url}) | [Discord]({msg_url}) — {title} ({count} reaction{'s' if count != 1 else ''})")
 
+        log.info("Displaying top %d reactions", len(lines))
         await ctx.reply("\n".join(lines), ephemeral=True)
+
+    @commands.hybrid_command(name="dashboard", description="Show a stats dashboard")
+    async def dashboard(self, ctx):
+        """Display total memes, top users, subreddits, and keywords."""
+        try:
+            # 1) Read from stats.json
+            with open("stats.json", "r") as f:
+                all_stats = json.load(f)
+
+            total = all_stats.get("total_memes", 0)
+            nsfw = all_stats.get("nsfw_memes", 0)
+
+            # 2) Top 3 users
+            users = all_stats.get("user_counts", {})
+            top_users = sorted(users.items(), key=lambda x: x[1], reverse=True)[:3]
+            user_lines = "\n".join(f"{u}: {c}" for u, c in top_users) or "None"
+
+            # 3) Top 3 subreddits
+            subs = all_stats.get("subreddit_counts", {})
+            top_subs = sorted(subs.items(), key=lambda x: x[1], reverse=True)[:3]
+            sub_lines = "\n".join(f"{s}: {c}" for s, c in top_subs) or "None"
+
+            # 4) Top 3 keywords
+            kws = all_stats.get("keyword_counts", {})
+            top_kws = sorted(kws.items(), key=lambda x: x[1], reverse=True)[:3]
+            kw_lines = "\n".join(f"{k}: {c}" for k, c in top_kws) or "None"
+
+            # 5) Build the embed
+            embed = discord.Embed(
+                title="📊 MemeBot Dashboard",
+                color=discord.Color.blurple(),
+                timestamp=datetime.utcnow()
+            )
+            embed.add_field(name="Total Memes",       value=str(total), inline=True)
+            embed.add_field(name="NSFW Memes",        value=str(nsfw), inline=True)
+            embed.add_field(name="\u200b",            value="\u200b", inline=True)  # spacer
+            embed.add_field(name="Top Users",         value=user_lines, inline=False)
+            embed.add_field(name="Top Subreddits",    value=sub_lines, inline=False)
+            embed.add_field(name="Top Keywords",      value=kw_lines, inline=False)
+
+            await ctx.reply(embed=embed, ephemeral=True)
+
+        except Exception:
+            log.error("dashboard command error", exc_info=True)
+            await ctx.reply("❌ Error generating dashboard.", ephemeral=True)
 
     @commands.hybrid_command(name="memestats", description="Show meme usage stats")
     async def memestats(self, ctx: commands.Context) -> None:
@@ -479,45 +555,113 @@ class Meme(commands.Cog):
             nsfw_count = stats.get('nsfw_memes', 0)
             kw_counts = stats.get('keyword_counts', {})
             top_kw = max(kw_counts, key=kw_counts.get) if kw_counts else 'N/A'
-            await ctx.reply(f"Total: {total} | NSFW: {nsfw_count} | TopKeyword: {top_kw}", ephemeral=True)
-        except Exception as e:
+            log.debug("memestats: total=%d, nsfw=%d, top_kw=%s", total, nsfw_count, top_kw)
+            await ctx.reply(
+                f"Total Memes: {total} | NSFW: {nsfw_count} | Top Keyword: {top_kw}",
+                ephemeral=True
+            )
+        except Exception:
+            log.error("Error fetching meme stats", exc_info=True)
             await ctx.reply("❌ Error getting meme stats.", ephemeral=True)
 
+
     @commands.hybrid_command(name="topusers", description="Show top meme users")
-    async def topusers(self, ctx: commands.Context) -> None:
-        users = stats.get('user_counts', {})
-        leaderboard = []
-        for uid, count in sorted(users.items(), key=lambda x: x[1], reverse=True)[:5]:
-            try:
-                member = await ctx.guild.fetch_member(int(uid))
-                name = member.display_name
-            except Exception:
-                name = uid
-            leaderboard.append(f"{name}: {count}")
-        await ctx.reply("\n".join(leaderboard) or "No data", ephemeral=True)
+    async def topusers(self, ctx):
+        try:
+            users = stats.get('user_counts', {})
+            leaderboard = []
+            for uid, count in sorted(users.items(), key=lambda x: x[1], reverse=True)[:5]:
+                try:
+                    member = await ctx.guild.fetch_member(int(uid))
+                    name = member.display_name
+                except Exception:
+                    name = uid
+                leaderboard.append(f"{name}: {count}")
+            log.info("topusers: sending %d entries", len(leaderboard))
+            await ctx.reply("\n".join(leaderboard) or "No data", ephemeral=True)
+        except Exception:
+            log.error("topusers command error", exc_info=True)
+            await ctx.reply("❌ Error showing top users.", ephemeral=True)
 
     @commands.hybrid_command(name="topkeywords", description="Show top meme keywords")
-    async def topkeywords(self, ctx: commands.Context) -> None:
-        kw_counts = stats.get('keyword_counts', {})
-        leaderboard = [f"{kw}: {cnt}" for kw, cnt in sorted(
-            kw_counts.items(), key=lambda x: x[1], reverse=True)[:5]]
-        await ctx.reply("\n".join(leaderboard) or "No data", ephemeral=True)
+    async def topkeywords(self, ctx):
+        try:
+            kw_counts = stats.get('keyword_counts', {})
+            leaderboard = [f"{kw}: {cnt}" for kw, cnt in sorted(kw_counts.items(), key=lambda x: x[1], reverse=True)[:5]]
+            log.info("topkeywords: sending %d items", len(leaderboard))
+            await ctx.reply("\n".join(leaderboard) or "No data", ephemeral=True)
+        except Exception:
+            log.error("topkeywords command error", exc_info=True)
+            await ctx.reply("❌ Error showing top keywords.", ephemeral=True)
 
     @commands.hybrid_command(name="topsubreddits", description="Show top used subreddits")
-    async def topsubreddits(self, ctx: commands.Context) -> None:
-        sub_counts = stats.get('subreddit_counts', {})
-        leaderboard = [f"{sub}: {cnt}" for sub, cnt in sorted(
-            sub_counts.items(), key=lambda x: x[1], reverse=True)[:5]]
-        await ctx.reply("\n".join(leaderboard) or "No data", ephemeral=True)
+    async def topsubreddits(self, ctx):
+        try:
+            sub_counts = stats.get('subreddit_counts', {})
+            leaderboard = [f"{sub}: {cnt}" for sub, cnt in sorted(sub_counts.items(), key=lambda x: x[1], reverse=True)[:5]]
+            log.info("topsubreddits: sending %d items", len(leaderboard))
+            await ctx.reply("\n".join(leaderboard) or "No data", ephemeral=True)
+        except Exception:
+            log.error("topsubreddits command error", exc_info=True)
+            await ctx.reply("❌ Error showing top subreddits.", ephemeral=True)
 
     @commands.hybrid_command(name="listsubreddits", description="List current SFW and NSFW subreddits")
-    async def listsubreddits(self, ctx: commands.Context) -> None:
-        sfw = ", ".join(self.subreddits.get('sfw', [])) or "None"
-        nsfw = ", ".join(self.subreddits.get('nsfw', [])) or "None"
-        embed = discord.Embed(title="Loaded Subreddits")
-        embed.add_field(name="SFW", value=sfw, inline=False)
-        embed.add_field(name="NSFW", value=nsfw, inline=False)
-        await ctx.reply(embed=embed, ephemeral=True)
+    async def listsubreddits(self, ctx):
+        try:
+            sfw = ", ".join(self.subreddits.get('sfw', [])) or "None"
+            nsfw = ", ".join(self.subreddits.get('nsfw', [])) or "None"
+            log.info("listsubreddits: %d sfw, %d nsfw", len(self.subreddits.get('sfw', [])), len(self.subreddits.get('nsfw', [])))
+            embed = discord.Embed(title="Loaded Subreddits")
+            embed.add_field(name="SFW", value=sfw, inline=False)
+            embed.add_field(name="NSFW", value=nsfw, inline=False)
+            await ctx.reply(embed=embed, ephemeral=True)
+        except Exception:
+            log.error("listsubreddits command error", exc_info=True)
+            await ctx.reply("❌ Error listing subreddits.", ephemeral=True)
+ 
+    @commands.hybrid_command(name="help", description="Show available meme commands")
+    async def help(self, ctx):
+        """Show a list of available bot commands."""
+        try:
+            embed = discord.Embed(
+                title="MemeBot Commands",
+                description="Here are the commands you can use:"
+            )
+            embed.add_field(name="/meme [keyword]", value="Fetch a SFW meme", inline=False)
+            embed.add_field(name="/nsfwmeme [keyword]", value="Fetch a NSFW meme", inline=False)
+            embed.add_field(name="/r_ <subreddit> [keyword]", value="Fetch a meme from a specific subreddit", inline=False)
+            embed.add_field(name="/reloadsubreddits", value="Reload and validate subreddit lists", inline=False)
+            embed.add_field(name="/topreactions", value="Show top 5 memes by reactions", inline=False)
+            embed.add_field(name="/memestats", value="Show meme usage stats", inline=False)
+            embed.add_field(name="/topusers", value="Show top meme users", inline=False)
+            embed.add_field(name="/topkeywords", value="Show top meme keywords", inline=False)
+            embed.add_field(name="/topsubreddits", value="Show top used subreddits", inline=False)
+            embed.add_field(name="/listsubreddits", value="List current SFW and NSFW subreddits", inline=False)
+            await ctx.reply(embed=embed, ephemeral=True)
+        except Exception:
+            log.error("help command error", exc_info=True)
+            await ctx.reply(
+                "❌ Something went wrong displaying the help menu. Please contact an admin.",
+                ephemeral=True
+            )
+
+    @commands.hybrid_command(name="ping", description="Check bot latency")
+    async def ping(self, ctx):
+        """Check current latency of the bot."""
+        latency_ms = round(self.bot.latency * 1000)
+        await ctx.reply(f"🏓 Pong! Latency is {latency_ms}ms", ephemeral=True)
+
+    @commands.hybrid_command(name="uptime", description="Show bot uptime")
+    async def uptime(self, ctx):
+        """Show how long the bot has been running."""
+        try:
+            elapsed = time.time() - self.start_time
+            hours, rem = divmod(int(elapsed), 3600)
+            minutes, seconds = divmod(rem, 60)
+            await ctx.reply(f"⏱️ Uptime: {hours}h {minutes}m {seconds}s", ephemeral=True)
+        except Exception:
+            log.error("uptime command error", exc_info=True)
+            await ctx.reply("❌ Error getting uptime.", ephemeral=True)
 
 async def setup(bot: commands.Bot) -> None:
     await bot.add_cog(Meme(bot))
