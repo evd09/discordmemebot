@@ -49,6 +49,7 @@ discord-meme-bot/
 - asyncpraw
 - python-dotenv
 - PyNaCl
+- aiosqlite
 
 ---
 ## Discord Bot Permissions: ##
