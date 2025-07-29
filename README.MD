@@ -144,6 +144,7 @@ cache.db
      ```
      ls -l subreddits.json
      ```
+
 2. **Open the file in a text editor**
    - Use your preferred editor (VSCode, nano, vim, etc):
      ```
@@ -153,6 +154,7 @@ cache.db
      ```
      code subreddits.json
      ```
+
 3. **Edit the lists**
    - Inside, you'll see a structure like this:
      ```json
@@ -178,20 +180,26 @@ cache.db
      }
      ```
    - **Tip:** Each subreddit should be in quotes, separated by commas.
+   - The more subreddit list the longer the API will call out to those pages and possible start limiting API calls. 
+   - You can check you JSON file with [JSON validator](https://jsonlint.com/).
+
 4. **Save the file**
    - If using `nano`, press `Ctrl+O` to write, then `Enter`, and `Ctrl+X` to exit.
+
 5. **(If using Docker) Make sure the file is mounted into your container**
    - Your `docker-compose.yml` or `docker run` command should have:
      ```
      - ./subreddits.json:/app/subreddits.json
      ```
    - This ensures changes on the host are seen inside the running container.
+
 6. **Reload subreddits in the bot**
    - Use the `/reloadsubreddits` command in your Discord server **OR** restart your bot for the changes to take effect.
      ```
      /reloadsubreddits
      ```
    - The bot should reply with the updated validation info.
+
 7. **Verify**
    - Try `/meme` or `/nsfwmeme` with your new subreddits/keywords to check!
 
