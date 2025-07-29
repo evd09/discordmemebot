@@ -6,4 +6,5 @@ COPY . .
 
 RUN pip install --no-cache-dir -r requirements.txt
 
-CMD ["python", "bot.py"]
+# Use unbuffered mode to ensure logs appear in real-time
+CMD ["python", "-u", "bot.py"]
