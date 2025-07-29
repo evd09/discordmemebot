@@ -1,23 +1,26 @@
 # File: bot.py
 import os
-import asyncio
-import pathlib
-import discord
-import logging
-from aiohttp import web
-import json
-
-from discord.ext import commands
 from dotenv import load_dotenv
 
 load_dotenv()
+DEV_GUILD_ID = int(os.getenv("DEV_GUILD_ID", "0")) #Sync commands per Guild ID
+
+import asyncio
+import pathlib
+import discord
+from discord.errors import Forbidden 
+import logging
+from aiohttp import web
+import json
+from discord.ext import commands
+
 TOKEN = os.getenv("DISCORD_TOKEN")
 
 intents = discord.Intents.default()
 intents.message_content = True
 bot = commands.Bot(
     command_prefix="/",
-    help_command=None,    # disable default built‑in help
+    help_command=None,
     intents=intents
 )
 
@@ -45,12 +48,25 @@ async def stats_handler(request):
 @bot.event
 async def on_ready() -> None:
     log.info(f"🚀 Logged in as {bot.user} (ID: {bot.user.id})")
+    # Diagnostic: list every guild the bot is in
+    log.info("Bot is in guilds: %s", [g.id for g in bot.guilds])
+    log.info("DEV_GUILD_ID = %s", DEV_GUILD_ID)
+
     log.info("🔄 Syncing slash commands...")
     try:
+        if DEV_GUILD_ID:
+            guild = discord.Object(id=DEV_GUILD_ID)
+            synced = await bot.tree.sync(guild=guild)
+            log.info(f"✅ Synced {len(synced)} commands to dev guild {DEV_GUILD_ID}!")
+        else:
+            synced = await bot.tree.sync()
+            log.info(f"✅ Synced {len(synced)} commands globally!")
+    except Forbidden:
+        log.warning("Guild‑sync Forbidden (Missing Access); falling back to global sync")
         synced = await bot.tree.sync()
         log.info(f"✅ Synced {len(synced)} commands globally!")
-    except Exception as e:
-        log.error(f"❌ Failed to sync slash commands", exc_info=True)
+    except Exception:
+        log.error("❌ Failed to sync slash commands", exc_info=True)
 
 app = web.Application()
 app.router.add_get("/stats", stats_handler)
