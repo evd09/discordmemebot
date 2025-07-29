@@ -48,7 +48,8 @@ class Meme(commands.Cog):
                 "sfw": data.get("sfw", []),
                 "nsfw": data.get("nsfw", [])
             }
-        except Exception:
+        except Exception as e:
+            print(f"[ERROR] Failed to load subreddits.json: {e}")
             self.subreddits = {
                 "sfw": [
                     "memes", "wholesomememes", "dankmemes", "funny",
@@ -65,6 +66,20 @@ class Meme(commands.Cog):
 
     def cog_unload(self) -> None:
         self._prune_cache.cancel()
+    
+    def reload_subreddits_from_file(self):
+        try:
+            with open("subreddits.json", "r") as f:
+                data = json.load(f)
+            self.subreddits = {
+                "sfw": data.get("sfw", []),
+                "nsfw": data.get("nsfw", [])
+            }
+            print("[INFO] Reloaded subreddits.json successfully.")
+            return True
+        except Exception as e:
+            print(f"[ERROR] Failed to reload subreddits.json: {e}")
+            return False
 
     @tasks.loop(seconds=60)
     async def _prune_cache(self) -> None:
@@ -251,7 +266,7 @@ class Meme(commands.Cog):
                 embed.set_image(url=media_url)
                 embed.set_footer(text=f"r/{post.subreddit.display_name}")
                 msg = await ctx.send(embed=embed)
-
+            print("[DEBUG] register_meme_message called, saving stats:", stats)
             await register_meme_message(
                 msg.id,
                 ctx.channel.id,
@@ -259,6 +274,7 @@ class Meme(commands.Cog):
                 f"https://reddit.com{post.permalink}",
                 post.title
             )
+            update_stats(ctx.author.id, keyword or '', post.subreddit.display_name, nsfw=False)  # or True for NSFW
         except Exception as e:
             print(f"[ERROR] /meme command error: {e}")
             await ctx.reply("❌ Something went wrong while fetching memes.", ephemeral=True)
@@ -312,6 +328,7 @@ class Meme(commands.Cog):
                 f"https://reddit.com{post.permalink}",
                 post.title
             )
+            update_stats(ctx.author.id, keyword or '', post.subreddit.display_name, nsfw=True)  # or True for NSFW
         except Exception as e:
             print(f"[ERROR] /nsfwmeme command error: {e}")
             await ctx.reply("❌ Something went wrong while fetching NSFW memes.", ephemeral=True)
@@ -381,6 +398,7 @@ class Meme(commands.Cog):
                 f"https://reddit.com{chosen.permalink}",
                 chosen.title
             )
+            update_stats(ctx.author.id, keyword or '', post.subreddit.display_name, nsfw=False)  # or True for NSFW
         except Exception as e:
             print(f"[ERROR] /r_ command error: {e}")
             await ctx.reply("❌ Something went wrong while fetching memes from that subreddit.", ephemeral=True)
@@ -388,6 +406,18 @@ class Meme(commands.Cog):
     @commands.hybrid_command(name="reloadsubreddits", description="Reload and validate subreddit lists")
     async def reloadsubreddits(self, ctx: commands.Context):
         await ctx.defer(ephemeral=True)
+        # 1. Read from disk FIRST
+        try:
+            with open("subreddits.json", "r") as f:
+                data = json.load(f)
+            self.subreddits = {
+                "sfw": data.get("sfw", []),
+                "nsfw": data.get("nsfw", [])
+            }
+        except Exception as e:
+            return await ctx.send(f"❌ Failed to reload subreddits.json from disk: {e}", ephemeral=True)
+
+        # 2. Then validate
         try:
             report, total = await self.validate_subreddits()
             lines: List[str] = []
@@ -398,7 +428,7 @@ class Meme(commands.Cog):
                 for name, status, dt in report[cat]:
                     lines.append(f"{status} {name:15} — {dt:.2f}s")
             lines.append(f"**Total:** {total:.2f}s")
-            await ctx.send("\n".join(lines), ephemeral=True)   
+            await ctx.send("\n".join(lines), ephemeral=True)
             sfw_valid = sum(1 for _, status, _ in report['sfw'] if status == "✅")
             sfw_total = len(report['sfw'])
             nsfw_valid = sum(1 for _, status, _ in report['nsfw'] if status == "✅")
@@ -406,10 +436,10 @@ class Meme(commands.Cog):
             await ctx.send(
                 f"✅ Subreddit lists reloaded and tested! "
                 f"({sfw_valid}/{sfw_total} SFW, {nsfw_valid}/{nsfw_total} NSFW)", ephemeral=True
-            )   
+            )
         except Exception as e:
             await ctx.send("❌ There was an error reloading subreddits.", ephemeral=True)
-    
+   
     @commands.hybrid_command(name="topreactions", description="Show top 5 memes by reactions")
     async def topreactions(self, ctx):
 
