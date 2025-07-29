@@ -154,7 +154,6 @@ sudo docker run -d \
 	** OR **
 ```
 sudo docker pull ghcr.io/evd09/memebot:latest && docker run -d --name memebot --env-file .env -v "$(pwd)/stats.json":/app/stats.json -v "$(pwd)/cache.db":/app/cache.db ghcr.io/evd09/memebot:latest
-
 ```
 ### Docker Compose ###
 1. Create directory for config files
