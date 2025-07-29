@@ -180,7 +180,7 @@ cache.db
      }
      ```
    - **Tip:** Each subreddit should be in quotes, separated by commas.
-   - The more subreddit list the longer the API will call out to those pages and possible start limiting API calls. 
+   - The more subreddits you add to the list, the longer it will take for the bot to query each one, which may increase the chance of hitting Reddit’s API rate limiters.
    - You can check you JSON file with [JSON validator](https://jsonlint.com/).
 
 4. **Save the file**
