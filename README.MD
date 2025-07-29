@@ -56,7 +56,7 @@ discord-meme-bot/
 
 1. Clone the repository:
 ```bash
-   git clone https://github.com/evd09/memebot.git
+   git clone https://github.com/evd09/discordmemebot.git
    cd discord-meme-bot
 ```
 2. **Environment variables**:
