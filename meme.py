@@ -512,12 +512,20 @@ class Meme(commands.Cog):
                 all_stats = json.load(f)
 
             total = all_stats.get("total_memes", 0)
-            nsfw = all_stats.get("nsfw_memes", 0)
+            nsfw  = all_stats.get("nsfw_memes", 0)
 
-            # 2) Top 3 users
+            # 2) Top 3 users (resolve IDs to names)
             users = all_stats.get("user_counts", {})
             top_users = sorted(users.items(), key=lambda x: x[1], reverse=True)[:3]
-            user_lines = "\n".join(f"{u}: {c}" for u, c in top_users) or "None"
+            user_lines = []
+            for uid, count in top_users:
+                try:
+                    member = ctx.guild.get_member(int(uid)) or await ctx.guild.fetch_member(int(uid))
+                    name = member.display_name
+                except Exception:
+                    name = f"<@{uid}>"
+                user_lines.append(f"{name}: {count}")
+            user_lines = "\n".join(user_lines) or "None"
 
             # 3) Top 3 subreddits
             subs = all_stats.get("subreddit_counts", {})
@@ -535,12 +543,12 @@ class Meme(commands.Cog):
                 color=discord.Color.blurple(),
                 timestamp=datetime.utcnow()
             )
-            embed.add_field(name="Total Memes",       value=str(total), inline=True)
-            embed.add_field(name="NSFW Memes",        value=str(nsfw), inline=True)
-            embed.add_field(name="\u200b",            value="\u200b", inline=True)  # spacer
-            embed.add_field(name="Top Users",         value=user_lines, inline=False)
-            embed.add_field(name="Top Subreddits",    value=sub_lines, inline=False)
-            embed.add_field(name="Top Keywords",      value=kw_lines, inline=False)
+            embed.add_field(name="😂 Total Memes",    value=str(total),      inline=True)
+            embed.add_field(name="🔞 NSFW Memes",     value=str(nsfw),       inline=True)
+            embed.add_field(name="\u200b",         value="\u200b",        inline=True)  # spacer
+            embed.add_field(name="🥇 Top Users",    value=user_lines,      inline=False)
+            embed.add_field(name="🌐 Top Subreddits", value=sub_lines,    inline=False)
+            embed.add_field(name="🔍 Top Keywords",  value=kw_lines,      inline=False)
 
             await ctx.reply(embed=embed, ephemeral=True)
 
