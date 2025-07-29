@@ -2,6 +2,7 @@ import json
 import os
 
 STATS_FILE = "stats.json"
+MEME_MSGS_FILE = "meme_messages.json"   # NEW: file to track meme posts
 
 if os.path.exists(STATS_FILE):
     with open(STATS_FILE, "r") as f:
@@ -12,7 +13,8 @@ else:
         "nsfw_memes": 0,
         "keyword_counts": {},
         "user_counts": {},
-        "subreddit_counts": {}
+        "subreddit_counts": {},
+        "reactions": {}
     }
 
 def save_stats():
@@ -30,3 +32,30 @@ def update_stats(user_id, keyword, subreddit, nsfw=False):
     stats["subreddit_counts"][subreddit] = stats["subreddit_counts"].get(subreddit, 0) + 1
 
     save_stats()
+
+# --- NEW: Track meme messages and reactions ---
+if os.path.exists(MEME_MSGS_FILE):
+    with open(MEME_MSGS_FILE, "r") as f:
+        meme_msgs = json.load(f)
+else:
+    meme_msgs = {}  # message_id: {channel_id, guild_id, url, title, reactions: {}}
+
+def save_meme_msgs():
+    with open(MEME_MSGS_FILE, "w") as f:
+        json.dump(meme_msgs, f, indent=2)
+
+async def register_meme_message(message_id, channel_id, guild_id, url, title):
+    meme_msgs[str(message_id)] = {
+        "channel_id": str(channel_id),
+        "guild_id": str(guild_id),
+        "url": url,
+        "title": title,
+        "reactions": {}  # emoji: count
+    }
+    save_meme_msgs()
+
+async def track_reaction(message_id, user_id, emoji):
+    msgid = str(message_id)
+    if msgid in meme_msgs:
+        meme_msgs[msgid]["reactions"][emoji] = meme_msgs[msgid]["reactions"].get(emoji, 0) + 1
+        save_meme_msgs()
