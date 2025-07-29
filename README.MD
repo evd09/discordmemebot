@@ -194,9 +194,8 @@ cache.db
    - The bot should reply with the updated validation info.
 7. **Verify**
    - Try `/meme` or `/nsfwmeme` with your new subreddits/keywords to check!
----
 
-### ⚠️ Important Notes
+### ⚠️ Important Notes ###
 - Double-check your JSON formatting! A single missing comma or quote will break loading.
 - Only add public, active subreddits. NSFW subs **must** go in `"nsfw"`, SFW in `"sfw"`.
 - If the bot reports a problem loading or validating, check your `subreddits.json` for typos or formatting errors.
