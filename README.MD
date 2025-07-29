@@ -88,6 +88,8 @@ REDDIT_CLIENT_ID=your_reddit_client_id
 REDDIT_CLIENT_SECRET=your_reddit_client_secret
 REDDIT_USER_AGENT=discord:meme.bot:v1 (by /u/YourRedditUsername)
 ```
+   - Create an [Reddit API application](https://www.reddit.com/prefs/apps).
+
 3. Create cogs directory and move meme.py to cogs/
 ```
 mkdir cogs
