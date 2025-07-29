@@ -1,11 +1,15 @@
 services:
   memebot:
-    build: .
-    container_name: memer
+    image: ghcr.io/evd09/memebot:latest
+    container_name: Memer
     env_file: .env
     restart: unless-stopped
     volumes:
       - ./subreddits.json:/app/subreddits.json
       - ./stats.json:/app/stats.json  # (Optional) Persist stats
       - ./cache.db:/app/cache.db      # (Optional) Persist cache
-    # Add other options you need (ports, etc)
+   
+    #(Optional) Expose ports if your Http endpoint for stats.json.
+    #ports:
+    #  - "8080:8080"
+
