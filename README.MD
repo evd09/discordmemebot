@@ -1,4 +1,4 @@
-# Discord Meme Bot #
+# Discord Meme Bot 2.5 #
 
 A versatile Discord bot that fetches and serves memes from Reddit based on user keywords, supporting both SFW and NSFW content. It includes advanced features such as keyword-driven search, caching with cooldowns, dynamic subreddit validation, intelligent fallback mechanisms, and enhanced API rate limit handling with user notifications ensuring fast, reliable, and user-friendly meme delivery.
 
@@ -8,16 +8,16 @@ A versatile Discord bot that fetches and serves memes from Reddit based on user 
 - Keyword-driven meme search: Fetch memes by keyword or emoji, supporting whole-word and substring matching.
 - Dual listing coverage: Searches hot listings for broad results with smart caching.
 - SFW & NSFW modes: Separate `/meme` and `/nsfwmeme` commands; NSFW requires channel to be marked NSFW.
-- Fetch memes from any subreddit: New `/r_` command to fetch memes from specific subreddits with optional keyword filtering.
+- Subreddit‑specific fetch: /r_ <subreddit> [keyword] for custom sources with fallback to random.
 - Automatic fallback: If no matching meme is found, a random fallback post is served to avoid empty responses.
-- User cooldowns & caching: Per-user cooldown (default 10s) and meme result caching (default 5min) to reduce API calls.
+- Caching & cooldowns: Per‑user 10 s cooldown and 5 min cache to reduce API calls.
 - Subreddit validation: Dynamically fetches and validates SFW/NSFW subreddit lists from a remote JSON, with local fallback.
 - Usage statistics: Tracks total memes, NSFW count, top keywords, users, and subreddits in `stats.json` with `/memestats`, `/topusers`, `/topkeywords`, `/topsubreddits`.
 - Reaction tracking: Tracks meme message reactions to support leaderboard with `/topreactions`.
-- Rate limit awareness: Smart handling of Reddit API limits with exponential backoff, retries, and user notifications on delays.
+- Dynamic subreddit validation: Reload and verify lists at runtime.
 - Graceful shutdown: Cleans up Reddit client and database connection on exit.
-- Emoji & punctuation handling: Supports emoji searches and strips punctuation so "dont" matches "Don't" titles.
-- Slash commands: Fully implemented with Discord's application commands and guild-scoped syncing.
+- Utility commands: /help, /ping, /uptime, /dashboard.
+- HTTP stats endpoint: Exposes raw stats at /stats for external tools.
 
 ---
 
@@ -71,15 +71,18 @@ discord-meme-bot/
 
 ---
 
-## 🔧 Setup & Configuration ##
+## Running Locally ##
 
 1. Clone the repository:
 ```bash
 git clone https://github.com/evd09/discordmemebot.git
-cd discord-meme-bot
+cd discordmemebot
 ```
 2. **Environment variables**:
 Create a `.env` in the project root:
+```
+sudo nano .env
+```
 ```
 DISCORD_TOKEN=your_discord_bot_token
 APPLICATION_ID=your_discord_application_id
@@ -95,49 +98,113 @@ REDDIT_USER_AGENT=discord:meme.bot:v1 (by /u/YourRedditUsername)
 mkdir cogs
 mv meme.py cogs/
 ```
-4. Create stat.JSON
+4. Create stat.JSON & subreddits.json
 ```
+touch subreddits.json
 touch stats.json
 chmod 666 stats.json  # (optional, for write permission)
 ```
-(Optional) Add {} inside if you want:
-```
-echo "{}" > stats.json
-```
-### Running locally: ###
-1. Install dependencies:
+5. Install dependencies:
 ```
 pip install --no-cache-dir -r requirements.txt
 ```
-2. Run the bot:
+6. Run the bot:
 ```
 python bot.py
 ```
 ## 🐳 Docker ##
-1. Build the image:
+### Docker CLI ###
+1. Create directory for config files
 ```
-docker build -t discord-meme-bot .
+mkdir discordmemebot
+cd discordmemebot
 ```
-2. Run the container Basic interactive run with environment variables:
+2. Create stat.JSON & subreddits.json & .env
 ```
-docker run -it --env-file .env discord-meme-bot
+touch subreddits.json
+touch stats.json
+chmod 666 stats.json  # (optional, for write permission)
+touch subreddits.json # (optional, for write permission)
 ```
-### OR ###
-## 🐳 Docker Compose ##
-1. Place your .env file in the same directory as docker-compose.yml.
-2. Run in the directory of docker-compose.yml
 ```
-docker-compose up -d
+sudo nano .env
 ```
-### Docker Tips ###
-Bind mounting: Persist stats.json and cache.db outside the container:
 ```
-docker run -v /host/path/meme-data:/app -it --env-file .env discord-meme-bot
+DISCORD_TOKEN=your_discord_bot_token
+APPLICATION_ID=your_discord_application_id
+GUILD_ID=your_test_guild_id
+REDDIT_CLIENT_ID=your_reddit_client_id
+REDDIT_CLIENT_SECRET=your_reddit_client_secret
+REDDIT_USER_AGENT=discord:meme.bot:v1 (by /u/YourRedditUsername)
 ```
-- **.dockerignore**: Exclude data files:
-```ignore
-stats.json
-cache.db
+3. Pull the image:
+```
+sudo docker pull ghcr.io/evd09/memebot:latest
+```
+4. Run the container
+```
+sudo docker run -d \
+  --name memebot \
+  --env-file .env \
+  -v /full/path/to/stats.json:/app/stats.json \
+  -v /full/path/to/cache.db:/app/cache.db \
+  ghcr.io/evd09/memebot:latest
+```
+	** OR **
+```
+sudo docker pull ghcr.io/evd09/memebot:latest && docker run -d --name memebot --env-file .env -v "$(pwd)/stats.json":/app/stats.json -v "$(pwd)/cache.db":/app/cache.db ghcr.io/evd09/memebot:latest
+
+```
+### Docker Compose ###
+1. Create directory for config files
+```
+mkdir discordmemebot
+cd discordmemebot
+```
+2. Create stat.JSON & subreddits.json & .env
+```
+touch subreddits.json
+touch stats.json
+chmod 666 stats.json
+chmod 666 subreddits.json
+```
+```
+sudo nano .env
+```
+3. Place the following and update credentials
+```
+DISCORD_TOKEN=your_discord_bot_token
+APPLICATION_ID=your_discord_application_id
+GUILD_ID=your_test_guild_id
+REDDIT_CLIENT_ID=your_reddit_client_id
+REDDIT_CLIENT_SECRET=your_reddit_client_secret
+REDDIT_USER_AGENT=discord:meme.bot:v1 (by /u/YourRedditUsername)
+```
+2. Create a docker-compose.yml
+```
+sudo nano docker-compose.yml
+```
+```
+services:
+  memebot:
+    image: ghcr.io/evd09/memebot:latest
+    container_name: memebot
+    env_file: .env
+    restart: unless-stopped
+    volumes:
+      # Persist usage stats & cache
+      - ./stats.json:/app/stats.json
+      - ./cache.db:/app/cache.db
+	  - ./subreddits.json:/app/subreddits.json
+
+    # (Optional) Expose ports if your bot uses webhooks, etc.
+    # ports:
+    #   - "3000:3000"
+```
+3. Fetch latest image and start memebot
+```
+sudo docker compose pull memebot   
+sudo docker compose up -d memebot 
 ```
 ---
 ## 📝 How to Add More Subreddits to `subreddits.json`
@@ -232,6 +299,9 @@ That’s it! You can now easily expand your meme sources any time. 🎉
 | /topusers                 | Leaderboard of top meme requesters                                   |
 | /topsubreddits            | Most-used subreddit sources                                          |
 | /reloadsubreddits         | Force refresh & validation of subreddit lists                        |
+| /ping						| Health check (bot latency)										   |
+| /uptime					| Show how long the bot has been running							   |
+| /dashboard				| Show meme usage dashboard in Discord embed						   |
 
 ## 🎉 Contributing & Testing ##
 - Open issues or PRs for improvements.
