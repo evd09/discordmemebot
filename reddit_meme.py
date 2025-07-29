@@ -2,7 +2,8 @@ import asyncpraw
 import random
 import re
 
-async def get_meme(reddit, subreddits, keyword, nsfw=False):
+async def get_meme(reddit, subreddits, keyword, nsfw=False, exclude_ids=None):
+    exclude_ids = set(exclude_ids or [])
     """
     Fetches a random image post matching the keyword (including emojis) from provided subreddits.
 
@@ -54,8 +55,9 @@ async def get_meme(reddit, subreddits, keyword, nsfw=False):
                     if not match and keyword_lower in title_lower:
                         match = True
 
-                    if match:
+                    if match and post.id not in exclude_ids:
                         memes.append(post)
+
             except Exception:
                 # Skip invalid or inaccessible subreddits
                 continue
@@ -77,4 +79,3 @@ async def get_meme(reddit, subreddits, keyword, nsfw=False):
         except Exception:
             continue
     return random.choice(fallback) if fallback else None
-
