@@ -1,24 +1,13 @@
-# Discord Meme Bot 2.5 #
+# Discord Meme Bot #
 
 A versatile Discord bot that fetches and serves memes from Reddit based on user keywords, supporting both SFW and NSFW content. It includes advanced features such as keyword-driven search, caching with cooldowns, dynamic subreddit validation, intelligent fallback mechanisms, and enhanced API rate limit handling with user notifications ensuring fast, reliable, and user-friendly meme delivery.
 
 ---
 
-## 🚀 Key Features ##
-- Keyword-driven meme search: Fetch memes by keyword or emoji, supporting whole-word and substring matching.
-- Dual listing coverage: Searches hot listings for broad results with smart caching.
-- SFW & NSFW modes: Separate `/meme` and `/nsfwmeme` commands; NSFW requires channel to be marked NSFW.
-- Subreddit‑specific fetch: /r_ <subreddit> [keyword] for custom sources with fallback to random.
-- Automatic fallback: If no matching meme is found, a random fallback post is served to avoid empty responses.
-- Caching & cooldowns: Per‑user 10 s cooldown and 5 min cache to reduce API calls.
-- Subreddit validation: Dynamically fetches and validates SFW/NSFW subreddit lists from a remote JSON, with local fallback.
-- Usage statistics: Tracks total memes, NSFW count, top keywords, users, and subreddits in `stats.json` with `/memestats`, `/topusers`, `/topkeywords`, `/topsubreddits`.
-- Reaction tracking: Tracks meme message reactions to support leaderboard with `/topreactions`.
-- Dynamic subreddit validation: Reload and verify lists at runtime.
-- Graceful shutdown: Cleans up Reddit client and database connection on exit.
-- Utility commands: /help, /ping, /uptime, /dashboard.
-- HTTP stats endpoint: Exposes raw stats at /stats for external tools.
-
+## 🚀 New Features ##
+- Economy & Rewards features added.
+- Games & gambling features added.
+- Feature to disable all Economy, Rewards, and gambling features. /toggle_gambling >>> Need to have admin rights on the server.
 ---
 
 ## 📁 File Structure ##
@@ -26,6 +15,12 @@ A versatile Discord bot that fetches and serves memes from Reddit based on user 
 discord-meme-bot/
 ├── cogs/
 │   └── meme.py                # Main meme cog with commands and API integration
+│   ├── gambling.py            # Defines Discord commands for placing bets, playing games (like Blackjack), and handling wager logic  
+│	└── economy.py             # Provides core economy commands (e.g., balance checks, daily rewards) and interfaces with the store 
+├── helpers/
+│   └── store.py               # Abstracts read/write operations to the economy database (adds/removes user funds, queries balances)
+├── data/
+│   └── economy.db             # SQLite database file storing all user balances, transaction history, and economy settings 
 ├── meme_stats.py              # Meme stats and tracking utilities
 ├── bot.py                     # Main bot entrypoint and Discord setup
 ├── Dockerfile                 # Docker build instructions
@@ -72,47 +67,6 @@ discord-meme-bot/
 
 ---
 
-## Running Locally ##
-
-1. Clone the repository:
-```bash
-git clone https://github.com/evd09/discordmemebot.git
-cd discordmemebot
-```
-2. **Environment variables**:
-Create a `.env` in the project root:
-```
-sudo nano .env
-```
-```
-DISCORD_TOKEN=your_discord_bot_token
-APPLICATION_ID=your_discord_application_id
-GUILD_ID=your_test_guild_id
-REDDIT_CLIENT_ID=your_reddit_client_id
-REDDIT_CLIENT_SECRET=your_reddit_client_secret
-REDDIT_USER_AGENT=discord:meme.bot:v1 (by /u/YourRedditUsername)
-```
-   - Create an [Reddit API application](https://www.reddit.com/prefs/apps).
-
-3. Create cogs directory and move meme.py to cogs/
-```
-mkdir cogs
-mv meme.py cogs/
-```
-4. Create stat.JSON & subreddits.json
-```
-touch subreddits.json
-touch stats.json
-chmod 666 stats.json  # (optional, for write permission)
-```
-5. Install dependencies:
-```
-pip install --no-cache-dir -r requirements.txt
-```
-6. Run the bot:
-```
-python bot.py
-```
 ## 🐳 Docker ##
 ### Docker CLI ###
 1. Create directory for config files
@@ -123,9 +77,9 @@ cd discordmemebot
 2. Create stat.JSON & subreddits.json & .env
 ```
 touch subreddits.json
-touch stats.json
-chmod 666 stats.json  # (optional, for write permission)
 touch subreddits.json # (optional, for write permission)
+touch stats.json
+chmod 666 stats.json
 ```
 ```
 sudo nano .env
@@ -137,6 +91,12 @@ GUILD_ID=your_test_guild_id
 REDDIT_CLIENT_ID=your_reddit_client_id
 REDDIT_CLIENT_SECRET=your_reddit_client_secret
 REDDIT_USER_AGENT=discord:meme.bot:v1 (by /u/YourRedditUsername)
+COIN_NAME=Memes 💎                 # e.g. “Gold”, “Shards”, “Points”
+
+# Reward amounts (in your “coins”)
+BASE_REWARD=10       # coins every /meme or /nsfwmeme
+KEYWORD_BONUS=5      # extra if keyword matched
+DAILY_BONUS=50       # one-time daily bonuse
 ```
 3. Pull the image:
 ```
@@ -147,15 +107,14 @@ sudo docker pull ghcr.io/evd09/memebot:latest
 sudo docker run -d \
   --name memebot \
   --env-file .env \
-  -v /full/path/to/stats.json:/app/stats.json \
-  -v /full/path/to/cache.db:/app/cache.db \
+  -v "$(pwd)/stats.db":/app/stats.db \
+  -v "$(pwd)/subreddits.json":/app/subreddits.json \
   ghcr.io/evd09/memebot:latest
 ```
-
-** OR **
-
+	** OR **
 ```
 sudo docker pull ghcr.io/evd09/memebot:latest && docker run -d --name memebot --env-file .env -v "$(pwd)/stats.json":/app/stats.json -v "$(pwd)/cache.db":/app/cache.db ghcr.io/evd09/memebot:latest
+
 ```
 ### Docker Compose ###
 1. Create directory for config files
@@ -181,6 +140,12 @@ GUILD_ID=your_test_guild_id
 REDDIT_CLIENT_ID=your_reddit_client_id
 REDDIT_CLIENT_SECRET=your_reddit_client_secret
 REDDIT_USER_AGENT=discord:meme.bot:v1 (by /u/YourRedditUsername)
+COIN_NAME=Memes 💎                 # e.g. “Gold”, “Shards”, “Points”
+
+# Reward amounts (in your “coins”)
+BASE_REWARD=10       # coins every /meme or /nsfwmeme
+KEYWORD_BONUS=5      # extra if keyword matched
+DAILY_BONUS=50       # one-time daily bonuse
 ```
 2. Create a docker-compose.yml
 ```
@@ -194,10 +159,9 @@ services:
     env_file: .env
     restart: unless-stopped
     volumes:
-      # Persist usage stats & cache
+      - ./data:/app/data
+      - ./subreddits.json:/app/subreddits.json
       - ./stats.json:/app/stats.json
-      - ./cache.db:/app/cache.db
-	  - ./subreddits.json:/app/subreddits.json
 
     # (Optional) Expose ports if your bot uses webhooks, etc.
     # ports:
@@ -291,6 +255,7 @@ That’s it! You can now easily expand your meme sources any time. 🎉
 ## 🛠️ Commands Overview ##
 | Command                   | Description                                                          |
 |:--------------------------|:---------------------------------------------------------------------|
+| /help 					| List all commands													   |
 | /meme <keyword>           | Fetch a SFW meme by keyword or emoji                                 |
 | /nsfwmeme <kw>            | Fetch a NSFW meme (NSFW channel required)                            |
 | /r_ <subreddit> [keyword] | Fetch meme from a specific subreddit, optionally filtered by keyword |
@@ -303,7 +268,18 @@ That’s it! You can now easily expand your meme sources any time. 🎉
 | /reloadsubreddits         | Force refresh & validation of subreddit lists                        |
 | /ping						| Health check (bot latency)										   |
 | /uptime					| Show how long the bot has been running							   |
-| /dashboard				| Show meme usage dashboard in Discord embed						   |
+| /toggle_gambling enable:	| Enable or Disable Economy, Rewards, and gambling features			   |
+| /balance          		| Check your coin balance			                                   |
+| /toprich        			| Show top 5 richest users                   				           |
+| /buy <item> 				| Purchase a shop item  PlaceHolder									   |
+| /gamble flip <amount>     | Interactive coin flip                                   			   |
+| /gamble roll <amount>     | Interactive dice roll                                                |
+| /gamble highlow <amount>  | Interactive high-low card                             			   |
+| /gamble slots <amount>    | Spin the slots                              						   |
+| /gamble crash <amount>    | Crash game — cash out before it blows                                |
+| /gamble blackjack <amount>| Interactive blackjack                                          	   |
+| /gamble lottery           | Enter today's 10-coin lottery                        				   |
+
 
 ## 🎉 Contributing & Testing ##
 - Open issues or PRs for improvements.
