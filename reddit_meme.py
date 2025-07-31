@@ -79,4 +79,3 @@ async def get_meme(reddit, subreddits, keyword, nsfw=False, exclude_ids=None):
         except Exception:
             continue
     return random.choice(fallback) if fallback else None
-
