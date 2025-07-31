@@ -200,7 +200,7 @@ class Meme(commands.Cog):
         log.debug("fetch_meme: category=%s, keyword=%s, subs=%s", category, keyword, subs)
         if not subs:
             log.warning("No subreddits available for category '%s'", category)
-            return None
+            return None, False
 
         sub_name = random.choice(subs)
         try:
@@ -209,7 +209,7 @@ class Meme(commands.Cog):
             log.debug("Picked subreddit: %s", sub_name)
         except Exception:
             log.error("Could not fetch subreddit '%s'", sub_name, exc_info=True)
-            return None
+            return None, False
 
         await self._throttle_api(notify_wait=notify_wait)
         posts = [p async for p in subreddit.hot(limit=50) if not p.stickied]
@@ -229,16 +229,15 @@ class Meme(commands.Cog):
                 fallback = True
         if not posts:
             log.info("No posts left after filtering for '%s'", keyword)
-            return None
+            return None, False
 
         fresh = [p for p in posts if p.id not in self.recent_ids]
         log.debug("%d fresh posts (not recently seen)", len(fresh))
         chosen = random.choice(fresh if fresh else posts)
         self.recent_ids.append(chosen.id)
-        if fallback:
-            setattr(chosen, 'fallback', True)
+
         log.info("Chosen post: %s (id=%s)", chosen.title, chosen.id)
-        return chosen
+        return chosen, fallback
 
     @commands.Cog.listener()
     async def on_reaction_add(self, reaction, user):
@@ -249,103 +248,136 @@ class Meme(commands.Cog):
 
     @commands.hybrid_command(name="meme", description="Fetch a SFW meme")
     async def meme(self, ctx, keyword: Optional[str] = None):
+        """Fetch a SFW meme, with optional keyword filter, fallback notice, and rewards."""
+        ctx._chosen_fallback = False
+        ctx._no_reward       = False
+
         async def notify_wait(wait_seconds):
-            await ctx.send(
-                f"⚠️ Bot is rate-limited by Reddit API. Waiting for {wait_seconds:.1f}s before continuing...",
+            await ctx.interaction.followup.send(
+                f"⚠️ Bot is rate-limited by Reddit API. Waiting {wait_seconds:.1f}s…",
                 ephemeral=True
             )
 
+        # defer so we can use followup.send()
+        await ctx.defer()
+
         try:
-            await ctx.defer()
-            chosen = await self.fetch_meme('sfw', keyword, notify_wait=notify_wait)
+            chosen, fallback = await self.fetch_meme('sfw', keyword, notify_wait=notify_wait)
             if not chosen:
-                return await ctx.reply("😔 Couldn't find any memes.", ephemeral=True)
+                ctx._no_reward = True
+                return await ctx.interaction.followup.send(
+                    "😔 Couldn't find any memes.",
+                    ephemeral=True
+                )
 
+            # keyword-only fallback: notify, but still send the embed
+            if keyword and fallback:
+                # only suppress the keyword bonus, not the base reward
+                ctx._chosen_fallback = True
+                await ctx.interaction.followup.send(
+                    f"❌ Couldn't find any memes for `{keyword}`, here's a random one!",
+                    ephemeral=True
+                )
+
+            # build & send embed
             media_url = self.get_media_url(chosen)
-            log.debug("Media URL: %s", media_url)
-
             embed = Embed(title=chosen.title, url=f"https://reddit.com{chosen.permalink}")
-            if media_url and (
-                media_url.lower().endswith(('.mp4', '.webm', '.gif'))
-                or "v.redd.it" in media_url
-            ):
+            if media_url and (media_url.lower().endswith(('.mp4', '.webm', '.gif')) or "v.redd.it" in media_url):
                 thumb = self.get_video_thumbnail(chosen)
                 if thumb:
                     embed.set_image(url=thumb)
                 embed.add_field(name="Video Link", value=media_url, inline=False)
             else:
                 embed.set_image(url=media_url)
-
             embed.set_footer(text=f"r/{chosen.subreddit.display_name}")
 
-            msg = await ctx.send(embed=embed)
+            await ctx.interaction.followup.send(embed=embed)
+
+            # register + stats
             await register_meme_message(
-                msg.id,
-                ctx.channel.id,
-                ctx.guild.id,
-                f"https://reddit.com{chosen.permalink}",
-                chosen.title
+                ctx.interaction.id, ctx.channel.id, ctx.guild.id,
+                f"https://reddit.com{chosen.permalink}", chosen.title
             )
             update_stats(ctx.author.id, keyword or '', chosen.subreddit.display_name, nsfw=False)
 
         except Exception:
+            ctx._no_reward = True
             log.error("meme command error", exc_info=True)
-            await ctx.reply(
-                "❌ Oops! We ran into an issue fetching memes. Please let the admin know so they can take a look.",
+            await ctx.interaction.followup.send(
+                "❌ Oops! Something went wrong fetching memes. Please let the admin know.",
                 ephemeral=True
             )
 
     @commands.hybrid_command(name="nsfwmeme", description="Fetch a NSFW meme (NSFW channels only)")
     async def nsfwmeme(self, ctx, keyword: Optional[str] = None):
-        async def notify_wait(wait_seconds):
-            await ctx.send(
-                f"⚠️ Bot is rate-limited by Reddit API. Waiting for {wait_seconds:.1f}s before continuing...",
+        """Fetch a NSFW meme, with optional keyword filter, fallback notice, and rewards."""
+        ctx._chosen_fallback = False
+        ctx._no_reward       = False
+
+        # 1) early-exit if not NSFW channel
+        if not ctx.channel.is_nsfw():
+            ctx._no_reward = True
+            return await ctx.interaction.response.send_message(
+                "🔞 You can only use NSFW memes in NSFW channels.",
                 ephemeral=True
             )
 
+        async def notify_wait(wait_seconds):
+            await ctx.interaction.followup.send(
+                f"⚠️ Bot is rate-limited by Reddit API. Waiting {wait_seconds:.1f}s…",
+                ephemeral=True
+            )
+
+        # defer so we can use followup.send()
+        await ctx.defer()
+
         try:
-            if not ctx.channel.is_nsfw():
-                return await ctx.reply("🔞 You can only use NSFW memes in NSFW channels.", ephemeral=True)
-
-            await ctx.defer()
-            chosen = await self.fetch_meme('nsfw', keyword, notify_wait=notify_wait)
+            chosen, fallback = await self.fetch_meme('nsfw', keyword, notify_wait=notify_wait)
             if not chosen:
-                return await ctx.reply("😔 Couldn't find any NSFW memes.", ephemeral=True)
+                ctx._no_reward = True
+                return await ctx.interaction.followup.send(
+                    "😔 Couldn't find any NSFW memes.",
+                    ephemeral=True
+                )
 
+            # keyword-only fallback: notify, but still send the embed
+            if keyword and fallback:
+                # only suppress the keyword bonus, not the base reward
+                ctx._chosen_fallback = True
+                await ctx.interaction.followup.send(
+                    f"❌ Couldn't find any NSFW memes for `{keyword}`, here's a random one!",
+                    ephemeral=True
+                )
+
+            # build & send embed
             media_url = self.get_media_url(chosen)
-            log.debug("Media URL: %s", media_url)
-
             embed = Embed(title=chosen.title, url=f"https://reddit.com{chosen.permalink}")
-            if media_url and (
-                media_url.lower().endswith(('.mp4', '.webm', '.gif'))
-                or "v.redd.it" in media_url
-            ):
+            if media_url and (media_url.lower().endswith(('.mp4', '.webm', '.gif')) or "v.redd.it" in media_url):
                 thumb = self.get_video_thumbnail(chosen)
                 if thumb:
                     embed.set_image(url=thumb)
                 embed.add_field(name="Video Link", value=media_url, inline=False)
             else:
                 embed.set_image(url=media_url)
-
             embed.set_footer(text=f"r/{chosen.subreddit.display_name}")
 
-            msg = await ctx.send(embed=embed)
+            await ctx.interaction.followup.send(embed=embed)
+
+            # register + stats
             await register_meme_message(
-                msg.id,
-                ctx.channel.id,
-                ctx.guild.id,
-                f"https://reddit.com{chosen.permalink}",
-                chosen.title
+                ctx.interaction.id, ctx.channel.id, ctx.guild.id,
+                f"https://reddit.com{chosen.permalink}", chosen.title
             )
             update_stats(ctx.author.id, keyword or '', chosen.subreddit.display_name, nsfw=True)
 
         except Exception:
+            ctx._no_reward = True
             log.error("nsfwmeme command error", exc_info=True)
-            await ctx.reply(
-                "❌ Oops! We ran into an issue fetching NSFW memes. Please let the admin know so they can take a look.",
+            await ctx.interaction.followup.send(
+                "❌ Oops! Something went wrong fetching NSFW memes. Please let the admin know.",
                 ephemeral=True
             )
-
+         
     @commands.hybrid_command(name="r_", description="Fetch a meme from a specific subreddit")
     async def r_(self, ctx, subreddit: str, keyword: Optional[str] = None):
         """Fetch a meme from a given subreddit, with optional keyword filtering and fallback."""
@@ -627,31 +659,48 @@ class Meme(commands.Cog):
             log.error("listsubreddits command error", exc_info=True)
             await ctx.reply("❌ Error listing subreddits.", ephemeral=True)
  
-    @commands.hybrid_command(name="help", description="Show available meme commands")
-    async def help(self, ctx):
+    @commands.hybrid_command(name="help", description="Show all available commands")
+    async def help(self, ctx: commands.Context):
         """Show a list of available bot commands."""
-        try:
-            embed = discord.Embed(
-                title="MemeBot Commands",
-                description="Here are the commands you can use:"
-            )
-            embed.add_field(name="/meme [keyword]", value="Fetch a SFW meme", inline=False)
-            embed.add_field(name="/nsfwmeme [keyword]", value="Fetch a NSFW meme", inline=False)
-            embed.add_field(name="/r_ <subreddit> [keyword]", value="Fetch a meme from a specific subreddit", inline=False)
-            embed.add_field(name="/reloadsubreddits", value="Reload and validate subreddit lists", inline=False)
-            embed.add_field(name="/topreactions", value="Show top 5 memes by reactions", inline=False)
-            embed.add_field(name="/memestats", value="Show meme usage stats", inline=False)
-            embed.add_field(name="/topusers", value="Show top meme users", inline=False)
-            embed.add_field(name="/topkeywords", value="Show top meme keywords", inline=False)
-            embed.add_field(name="/topsubreddits", value="Show top used subreddits", inline=False)
-            embed.add_field(name="/listsubreddits", value="List current SFW and NSFW subreddits", inline=False)
-            await ctx.reply(embed=embed, ephemeral=True)
-        except Exception:
-            log.error("help command error", exc_info=True)
-            await ctx.reply(
-                "❌ Something went wrong displaying the help menu. Please contact an admin.",
-                ephemeral=True
-            )
+        embed = discord.Embed(
+            title="🤖 Bot Commands",
+            description="Here's what I can do:",
+            color=discord.Color.blurple()
+        )
+
+        # Economy
+        embed.add_field(name="`/balance`", value="Check your coin balance", inline=False)
+        embed.add_field(name="`/toprich`", value="Show top 5 richest users", inline=False)
+        embed.add_field(name="`/buy <item>`", value="Purchase a shop item", inline=False)
+
+        # Meme
+        embed.add_field(name="`/meme [keyword]`", value="Fetch a SFW meme", inline=False)
+        embed.add_field(name="`/nsfwmeme [keyword]`", value="Fetch a NSFW meme", inline=False)
+        embed.add_field(name="`/r_ <subreddit> [keyword]`", value="Fetch from a specific subreddit", inline=False)
+        embed.add_field(name="`/reloadsubreddits`", value="Reload & validate subreddit lists", inline=False)
+        embed.add_field(name="`/topreactions`", value="Show top 5 memes by reactions", inline=False)
+        embed.add_field(name="`/memestats`", value="Show meme usage stats", inline=False)
+        embed.add_field(name="`/topusers`", value="Show top meme users", inline=False)
+        embed.add_field(name="`/topkeywords`", value="Show top meme keywords", inline=False)
+        embed.add_field(name="`/topsubreddits`", value="Show top used subreddits", inline=False)
+        embed.add_field(name="`/listsubreddits`", value="List current SFW & NSFW subreddits", inline=False)
+
+        # Gamble
+        embed.add_field(name="`/gamble flip <amount>`", value="Interactive coin flip", inline=False)
+        embed.add_field(name="`/gamble roll <amount>`", value="Interactive dice roll", inline=False)
+        embed.add_field(name="`/gamble highlow <amount>`", value="Interactive high-low card", inline=False)
+        embed.add_field(name="`/gamble slots <amount>`", value="Spin the slots", inline=False)
+        embed.add_field(name="`/gamble crash <amount>`", value="Crash game — cash out before it blows", inline=False)
+        embed.add_field(name="`/gamble blackjack <amount>`", value="Interactive blackjack", inline=False)
+        embed.add_field(name="`/gamble lottery`", value="Enter today's 10-coin lottery", inline=False)
+
+        await ctx.reply(embed=embed, ephemeral=True)
+
+    @help.error
+    async def help_error(self, ctx, error):
+        log.error("Help command error", exc_info=error)
+        await ctx.reply("❌ Could not show help. Please try again later.", ephemeral=True)
+
 
     @commands.hybrid_command(name="ping", description="Check bot latency")
     async def ping(self, ctx):
@@ -673,3 +722,4 @@ class Meme(commands.Cog):
 
 async def setup(bot: commands.Bot) -> None:
     await bot.add_cog(Meme(bot))
+
