@@ -3,9 +3,10 @@
 # Version 3.0 #
 
 ### Added ### 
-Economy & Rewards features added.
-Games & gambling features added.
-Feature to disable all Economy, Rewards, and gambling features. /toggle_gambling >>> Need to have admin rights on the server.
+- Economy & Rewards features added.
+- Gambling games features added.
+- Feature to disable all Economy, Rewards, and gambling features. /toggle_gambling
+	- Need to have admin rights on the server.
 
 # Version 2.5 #
 
