@@ -5,10 +5,13 @@ services:
     env_file: .env
     restart: unless-stopped
     volumes:
+      # bind-mount host ./data into /app/data
+      - ./data:/app/data
+      # bind-mount your subreddit list
       - ./subreddits.json:/app/subreddits.json
-      - ./stats.json:/app/stats.json  # (Optional) Persist stats
-      - ./cache.db:/app/cache.db      # (Optional) Persist cache
-   
+      - ./stats.json:/app/stats.json
+      - ./cache.db:/app/cache.db
+      
     #(Optional) Expose ports if your Http endpoint for stats.json.
     #ports:
     #  - "8080:8080"
