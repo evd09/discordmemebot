@@ -1,6 +1,13 @@
 # Changelog
 
-Version 2.5
+# Version 3.0 #
+
+### Added ### 
+Economy & Rewards features added.
+Games & gambling features added.
+Feature to disable all Economy, Rewards, and gambling features. /toggle_gambling >>> Need to have admin rights on the server.
+
+# Version 2.5 #
 
 1. Replaced print() Debugs with Structured Logging
 - Introduced a module‑level log = logging.getLogger(__name__) in both bot.py and cogs/meme.py.
