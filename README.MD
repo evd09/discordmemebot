@@ -40,8 +40,8 @@ memebot/
 │       ├── entrance.py             	   # /entrance UI View (set, preview, save, remove)
 │       ├── constants.py                   # Folder paths and config
 │	│   ├── audio_admin.py 		   # audio admin commands 
-│	│	├── audio_events.py	   # Handles audio-related Discord bot events.
-│	│	└── voice_error_manager.py # Manages errors during voice playback.
+│	│   ├── audio_events.py	           # Handles audio-related Discord bot events.
+│	│   └── voice_error_manager.py     # Manages errors during voice playback.
 │	│
 │	├── meme.py                	   # Main meme cog with commands and API integration
 │	├── gambling.py                    # Defines Discord commands for placing bets, playing games (like Blackjack), and handling wager logic 
@@ -279,3 +279,4 @@ Subreddits are now managed live using Discord slash commands.
 
 
 Happy memeing! 😄 
+
