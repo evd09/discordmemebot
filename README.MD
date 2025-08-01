@@ -119,6 +119,8 @@ cd discordmemebot
 ### 2. Create Required Folders and .env File ###
 ```
 mkdir sounds data logs
+mkdir -p sounds/entrances
+mkdir -p sounds/beeps
 nano .env
 ```
 ```
@@ -279,4 +281,5 @@ Subreddits are now managed live using Discord slash commands.
 
 
 Happy memeing! 😄 
+
 
