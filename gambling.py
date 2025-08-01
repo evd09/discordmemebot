@@ -1,27 +1,24 @@
 # cogs/gambling.py
+import discord
 import random
 import logging
 import asyncio
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Literal, List, Optional, Callable, Awaitable
 import discord
 from discord import Embed
 from discord import app_commands, Interaction
 from discord.ui import View, button, Button
-# from discord.app_commands import Range   # <-- unused, remove if not using Range
-from discord.ext import commands
+from discord.ext import commands, tasks
 from helpers.store import Store
 
 log = logging.getLogger(__name__)
 
 def gambling_enabled():
     async def predicate(interaction: Interaction) -> bool:
-        # grab your Cog instance off the bot
         cog = interaction.client.get_cog("Gamble")
         if cog is None:
-            # Cog not loaded? Block
             raise app_commands.CheckFailure("❌ Gambling is not available.")
-
         guild_id = str(interaction.guild_id)
         if not await cog.store.is_gambling_enabled(guild_id):
             raise app_commands.CheckFailure("❌ Gambling is disabled in this server.")
@@ -545,6 +542,7 @@ class Gamble(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.store = Store()
+        self.last_gamble_channel = None  # Track the last used gamble channel!
 
     # 1) Define slash command group (no invoke_without_command here)
     gamble = app_commands.Group(
@@ -605,6 +603,7 @@ class Gamble(commands.Cog):
     @gamble.command(name="flip", description="Flip a coin: win on your guess.")
     @app_commands.describe(amount="How many coins to wager")
     async def flip(self, interaction: Interaction, amount: int):
+        self.last_gamble_channel = interaction.channel.id
         uid  = str(interaction.user.id)
         bal  = await self.store.get_balance(uid)
         name = self.bot.config.COIN_NAME
@@ -633,6 +632,7 @@ class Gamble(commands.Cog):
     @gamble.command(name="highlow", description="Guess whether the next card is higher or lower.")
     @app_commands.describe(amount="How many coins to wager")
     async def highlow(self, interaction: Interaction, amount: int):
+        self.last_gamble_channel = interaction.channel.id
         uid  = str(interaction.user.id)
         bal  = await self.store.get_balance(uid)
         name = self.bot.config.COIN_NAME
@@ -658,6 +658,7 @@ class Gamble(commands.Cog):
     @gamble.command(name="roll", description="Roll a die: win if you meet or exceed your target.")
     @app_commands.describe(amount="How many coins to wager")
     async def roll(self, interaction: Interaction, amount: int):
+        self.last_gamble_channel = interaction.channel.id
         uid  = str(interaction.user.id)
         bal  = await self.store.get_balance(uid)
         name = self.bot.config.COIN_NAME
@@ -687,6 +688,7 @@ class Gamble(commands.Cog):
         interaction: Interaction,
         amount: int
     ):
+        self.last_gamble_channel = interaction.channel.id
         uid = str(interaction.user.id)
         bal = await self.store.get_balance(uid)
         name = self.bot.config.COIN_NAME
@@ -717,6 +719,7 @@ class Gamble(commands.Cog):
         description="Enter the daily lottery (10 coins). Draw at 00:00 bot local time."
     )
     async def lottery(self, interaction: Interaction):
+        self.last_gamble_channel = interaction.channel.id
         uid = str(interaction.user.id)
         cost = 10
         bal = await self.store.get_balance(uid)
@@ -747,6 +750,7 @@ class Gamble(commands.Cog):
     @gamble.command(name="crash", description="Crash game: decide when to cash out before it crashes!")
     @app_commands.describe(amount="How many coins to wager")
     async def crash(self, interaction: Interaction, amount: int):
+        self.last_gamble_channel = interaction.channel.id
         uid = interaction.user.id
         balance = await self.store.get_balance(str(uid))
         if amount > balance:
@@ -794,6 +798,7 @@ class Gamble(commands.Cog):
         amount: app_commands.Range[int, 1, 1000],  # enforce 1 ≤ amount ≤ 1000
         auto_aces: bool = False
     ):
+        self.last_gamble_channel = interaction.channel.id
         uid = str(interaction.user.id)
         bal = await self.store.get_balance(uid)
         if amount > bal:
@@ -823,6 +828,7 @@ class Gamble(commands.Cog):
         interaction: Interaction,
         limit: Optional[int] = 10
     ):
+        self.last_gamble_channel = interaction.channel.id
         limit = max(1, min(limit, 20))
         uid   = str(interaction.user.id)
         rows  = await self.store.get_transactions(uid, limit)
@@ -846,6 +852,7 @@ class Gamble(commands.Cog):
     @gambling_enabled()
     @gamble.command(name="winrate", description="Show your win/loss counts per game")
     async def winrate(self, interaction: Interaction):
+        self.last_gamble_channel = interaction.channel.id
         uid   = str(interaction.user.id)
         stats = await self.store.get_win_loss_counts(uid)
 
@@ -874,6 +881,42 @@ class Gamble(commands.Cog):
         await self.store.set_gambling(guild_id, enable)
         status = "enabled" if enable else "disabled"
         await ctx.reply(f"✅ Gambling has been **{status}** on this server.", ephemeral=True)
+
+    async def do_lottery_draw(self):
+        entries = await self.store.get_today_lottery_entries()
+        if not entries:
+            return
+        winner = random.choice(entries)
+        await self.store.update_balance(winner['user_id'], amount=100, reason="Lottery win")
+        await self.store.clear_lottery_entries()
+        
+        # Try last gamble channel
+        channel = self.bot.get_channel(self.last_gamble_channel) if self.last_gamble_channel else None
+
+        # Fallback: first text channel with permissions
+        if channel is None or not channel.permissions_for(channel.guild.me).send_messages:
+            main_guild = self.bot.guilds[0] if self.bot.guilds else None  # Safest fallback
+            if main_guild and main_guild.text_channels:
+                for ch in main_guild.text_channels:
+                    if ch.permissions_for(main_guild.me).send_messages:
+                        channel = ch
+                        break
+
+        user = self.bot.get_user(int(winner['user_id']))
+        if channel:
+            if user:
+                await channel.send(f"🎉 Congrats {user.mention}! You won the daily lottery! 💰")
+            else:
+                await channel.send(f"🎉 We have a winner, but couldn't find their user ID: `{winner['user_id']}`.")
+        else:
+            print("No channel found to announce the lottery winner.")
+
+        # Optionally DM the user
+        if user:
+            try:
+                await user.send("You won the daily lottery! Congrats!")
+            except Exception:
+                pass
 
 async def setup(bot):
     await bot.add_cog(Gamble(bot))
