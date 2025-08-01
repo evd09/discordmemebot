@@ -1,5 +1,52 @@
 # Changelog
 
+# Version 4.0 #
+Voice & Audio Features in MemeBot
+
+All new voice features are managed by slash commands — no file edits needed! 
+
+📂 Folders & Setup
+- sounds/ — Place general sound files (for /beep and other effects).
+- entrances/ — Place custom user entrance audio/video clips here.
+
+Both folders are auto-mounted via Docker. Supported: mp3, wav, m4a, mp4 (audio only), etc.
+🎤 Entrance Sound System
+1️⃣ Assign or Change Entrance Sound
+/entrance
+- Full UI lets you choose, preview, and set your entrance clip from the available files.
+- Admins can set for others.
+2️⃣ Preview Any Sound
+- Use the /entrance command and click Preview in the menu.
+3️⃣ Remove or Adjust Volume
+- Use /entrance and select “Remove” or adjust volume with the slider.
+
+🔊 Beep & Soundboard
+Play a Random Beep
+/beep
+
+Play a Specific Beep (with Autocomplete!)
+/beepfile <filename>
+
+List Available Beeps
+/listbeeps
+
+🏃‍♂️ What Happens When You Join Voice?
+- If you have an entrance sound, bot joins, plays your clip (with volume you set), then leaves automatically.
+- Supports both audio and video (extracts audio).
+- All files are cached for faster play.
+
+⚡ Advanced Controls (Admins)
+- Set any user’s entrance:
+- /setentrance <user> <filename>
+- UI supports fuzzy search, clickable file previews, and safe ephemeral (only you see) controls.
+- Limit on max cache size: /cacheinfo shows current audio cache.
+
+💡 Tips
+- File not showing? Make sure it’s in the right folder and has a supported extension.
+- UI not working? Refresh Discord or try the command again.
+- Volume too low/high? Use the slider in the /entrance UI.
+All changes are instant. No bot restart needed!
+
 # Version 3.0 #
 
 ### Added ### 
