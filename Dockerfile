@@ -1,15 +1,22 @@
 FROM python:3.11-slim
 
+# ── Install FFmpeg + Opus support ──
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends \
+      ffmpeg \
+      libopus0 \
+      opus-tools \
+      git \
+ && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
-# Copy your application code
+# ── Copy & install Python deps ──
 COPY . .
-
-# Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt \
+ && pip install --no-cache-dir "git+https://github.com/Rapptz/discord.py#egg=discord.py[voice]"
 
-# (Optional but helpful) Ensure logs are unbuffered for real-time output
 ENV PYTHONUNBUFFERED=1
 
-# Start the bot
 CMD ["python", "-u", "bot.py"]
