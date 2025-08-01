@@ -1,18 +1,13 @@
 services:
   memebot:
     image: ghcr.io/evd09/memebot:latest
-    container_name: Memer
+    container_name: memebot
     env_file: .env
     restart: unless-stopped
     volumes:
-      # bind-mount host ./data into /app/data
       - ./data:/app/data
-      # bind-mount your subreddit list
-      - ./subreddits.json:/app/subreddits.json
-      - ./stats.json:/app/stats.json
-      - ./cache.db:/app/cache.db
-      
-    #(Optional) Expose ports if your Http endpoint for stats.json.
-    #ports:
-    #  - "8080:8080"
+      - ./sounds:/app/sounds
+      - ./logs:/app/logs
+    # ports:
+    #   - "3000:3000"  # Optional: if you add a web UI, etc.
 
