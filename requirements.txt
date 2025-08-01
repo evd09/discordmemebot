@@ -1,5 +1,8 @@
-discord.py
+discord.py[voice]
 asyncpraw
 python-dotenv
 pynacl
 aiosqlite
+fuzzywuzzy
+python-Levenshtein
+aiohttp
