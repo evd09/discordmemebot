@@ -1,37 +1,87 @@
-# Discord Meme Bot 3.0 # 
-
-A versatile Discord bot that fetches and serves memes from Reddit based on user keywords, supporting both SFW and NSFW content. It includes advanced features such as keyword-driven search, caching with cooldowns, dynamic subreddit validation, intelligent fallback mechanisms, and enhanced API rate limit handling with user notifications ensuring fast, reliable, and user-friendly meme delivery.
-
+# MemeBot 4.0 — Audio, Entrances & Beeps Update #
+---
+## NOTE: ##
+MemeBot 4.0 requires discord.py version: 2.6.0a5239+g4496df79
+This fixes Discord 4006 session errors (audio/voice bugs) that affect all current stable versions when joining voice channels.
+## ❤️ Credits & Notes ##
+- Special thanks to the Discord.py team, Reddit API maintainers, and everyone reporting bugs for Discord 4006!
+- If you run into voice errors, always check your library version and update this repo for the latest fixes.
+- Dockerfile includes this requirements.
 ---
 
-## 🚀 New Features ##
-- Economy & Rewards features added.
-- Games & gambling features added.
-- Feature to disable all Economy, Rewards, and gambling features. /toggle_gambling >>> Need to have admin rights on the server.
----
+## 🎤 Audio, Entrance, and Beep System — Major Additions ##
 
+- User-assigned entrance sounds (per user, with volume control)
+- Interactive /entrance UI: Discord Views, dropdown file search, volume control, preview, and save — all in one ephemeral message
+- Random /beep command: Plays a random beep SFX
+- /beepfile <filename> with autocomplete: Instantly play a chosen beep by filename, powered by fuzzy search/autocomplete
+- Live voice channel playback (via FFmpeg) for both entrances and beeps
+- Preview before save: Test your entrance sound/volume as much as you want
+- Voice join/leave and audio error handling: Full support for Discord’s quirks (including 4006+ error auto-retry and cooldown logic)
+- Ephemeral UI: All interactive audio commands use ephemeral responses — only you see your settings
+- Admin Tools: /setentrance <user> <filename> and /reloadentrances for admins
+- Log file rotation/cleanup: Old/large logs are deleted automatically
+- Slash command autocomplete: For entrance/beep files
+---
+## 💡 Upgrading from v3.x ##
+- New sounds/entrances/ and sounds/beeps/ folders are required for audio features
+- entrance_sounds.json is auto-managed
+- Older meme/economy/gambling features still work — just add your API keys as before
+--- 
 ## 📁 File Structure ##
 ```
-discord-meme-bot/
+memebot/
+├── bot.py							# Main bot entrypoint and Discord setup
 ├── cogs/
-│   └── meme.py                # Main meme cog with commands and API integration
-│   ├── gambling.py            # Defines Discord commands for placing bets, playing games (like Blackjack), and handling wager logic  
-│	└── economy.py             # Provides core economy commands (e.g., balance checks, daily rewards) and interfaces with the store 
+│   └── audio/
+│   │   ├── audio_player.py         # Audio playback, RAM caching, and FFmpeg logic
+│   │   ├── audio_queue.py          # Smart queueing and cooldowns for all audio
+│   │   ├── beep.py                 # /beep, /beepfile, /listbeeps commands
+│   │   ├── entrance.py             # /entrance UI View (set, preview, save, remove)
+│   │   ├── constants.py            # Folder paths and config
+│	│   ├── audio_admin.py 		    # audio admin commands 
+│	│	├── audio_events.py		    # Handles audio-related Discord bot events.
+│	│	└── voice_error_manager.py  # Manages errors during voice playback.
+│	│
+│	├── meme.py                		# Main meme cog with commands and API integration
+│	├── gambling.py            		# Defines Discord commands for placing bets, playing games (like Blackjack), and handling wager logic 
+│	└── economy.py            		# Provides core economy commands (e.g., balance checks, daily rewards) and interfaces with the store
+│
 ├── helpers/
-│   └── store.py               # Abstracts read/write operations to the economy database (adds/removes user funds, queries balances)
+│   └── store.py               		# Abstracts read/write operations to the economy database (adds/removes user funds, queries balances) 
+│
 ├── data/
-│   └── economy.db             # SQLite database file storing all user balances, transaction history, and economy settings 
-├── meme_stats.py              # Meme stats and tracking utilities
-├── bot.py                     # Main bot entrypoint and Discord setup
-├── Dockerfile                 # Docker build instructions
-├── docker-compose.yml         # Docker Compose service configuration
-├── .env                       # Environment variables for bot and Reddit API keys
-├── requirements.txt           # Python dependencies list
-├── stats.json                 # Persistent meme stats file (volume mounted)
-├── cache.db                   # Persistent meme cache database (volume mounted)
-└── subreddits.json            # Cached subreddit lists (volume mounted)
+│   └── entrance_sounds.json        # User entrance assignments (auto-managed)
+│   └── economy.db             		# SQLite database file storing all user balances, transaction history, and economy settings 
+│
+├── sounds/
+│   ├── beeps/                    	# Random beep SFX files
+│   └── entrances/                	# Assignable entrance files (audio/video)
+│
+├── logs/
+│   ├── entrance.log
+│	├── audio.log 
+│   └── beep.log
+│
+├── meme_stats.py              		# Tracks meme usage, rewards, and statistics.
+├── reddit_meme.py                  # Fetches Reddit posts and extracts media.
+├── logger_setup.py	              	# Shared rotating logger
+├── log_cleanup.py                	# Scheduled log cleaner (optional)
+├── config.json                   	# (Optional) for cache settings etc.
+├── .env                          	# (Optional) for tokens/secrets
+├── requirements.txt
+├── docker-compose.yml
+├── Dockerfile
+└── subreddits.py            		# Stores and manages SFW/NSFW subreddit lists.
 ```
 ---
+
+## Setup Folders ##
+
+- Place beep sounds in sounds/beeps/
+- Place entrance files in sounds/entrances/
+	- (mp3, wav, ogg, mp4, webm supported)
+	
 
 ## 📦 Requirements ##
 - Python 3.11+
@@ -48,109 +98,62 @@ discord-meme-bot/
 
 ---
 ## Discord Bot Permissions: ##
-### Recommended Bot Permissions: ###
-| Permission                      | Purpose                                                |
-| ------------------------------- | ------------------------------------------------------ |
-| **Send Messages**               | To post memes and replies in channels                  |
-| **Embed Links**                 | To send rich embeds (titles, images, video thumbnails) |
-| **Read Message History**        | To access message context if needed                    |
-| **Use Slash Commands**          | To allow slash command invocation                      |
-| **Add Reactions**               | To add emoji reactions for meme voting or feedback     |
-| **Read Messages/View Channels** | To access messages and channels where it’s used        |
+| Permission               | Purpose                                  |
+| ------------------------ | ---------------------------------------- |
+| **Send Messages**        | To post memes/replies                    |
+| **Embed Links**          | To send rich embeds (images, video)      |
+| **Use Slash Commands**   | To allow modern slash commands           |
+| **Read Message History** | For user/guild stats                     |
+| **Add Reactions**        | For meme voting                          |
+| **Connect/Speak**        | For voice channel entrance/beep playback |
 
-### Optional (based on features): ###
-| Permission                     | Purpose                                                                            |
-| ------------------------------ | ---------------------------------------------------------------------------------- |
-| **Manage Messages**            | To delete or manage memes/messages if you implement moderation or cleanup features |
-| **Manage Emojis and Stickers** | If you want to add custom reactions or emojis                                      |
-| **Send TTS Messages**          | If your bot uses text-to-speech features                                           |
 
 ---
 
-## 🐳 Docker ##
-### Docker CLI ###
-1. Create directory for config files
+## 🐳 Docker Deployment for MemeBot ##
+### 1. Create directory for config files ###
 ```
 mkdir discordmemebot
 cd discordmemebot
 ```
-2. Create stat.JSON & subreddits.json & .env
+### 2. Create Required Folders and .env File ###
 ```
-touch subreddits.json
-touch subreddits.json # (optional, for write permission)
-touch stats.json
-chmod 666 stats.json
-```
-```
-sudo nano .env
+mkdir sounds data logs
+nano .env
 ```
 ```
 DISCORD_TOKEN=your_discord_bot_token
 APPLICATION_ID=your_discord_application_id
-GUILD_ID=your_test_guild_id
+DEV_GUILD_ID=your_test_guild_id    # Optional, only for testing in your server
 REDDIT_CLIENT_ID=your_reddit_client_id
 REDDIT_CLIENT_SECRET=your_reddit_client_secret
 REDDIT_USER_AGENT=discord:meme.bot:v1 (by /u/YourRedditUsername)
-COIN_NAME=Memes 💎                 # e.g. “Gold”, “Shards”, “Points”
+COIN_NAME=Memes 💎                # e.g. "Gold", "Shards", "Points"
 
-# Reward amounts (in your “coins”)
-BASE_REWARD=10       # coins every /meme or /nsfwmeme
-KEYWORD_BONUS=5      # extra if keyword matched
-DAILY_BONUS=50       # one-time daily bonuse
+# Reward amounts
+BASE_REWARD=10
+KEYWORD_BONUS=5
+DAILY_BONUS=50
+
+# Optional: audio cache limit
+MAX_CACHE_SIZE=100
 ```
-3. Pull the image:
+**Tip: Make sure you don’t have spaces around the = and remove any # comments from actual lines.**
+### 3. Run with Docker CLI ###
 ```
 sudo docker pull ghcr.io/evd09/memebot:latest
 ```
-4. Run the container
+**Start the bot:**
 ```
-sudo docker run -d \
-  --name memebot \
+sudo docker run -d --name memebot \
   --env-file .env \
-  -v "$(pwd)/stats.db":/app/stats.db \
-  -v "$(pwd)/subreddits.json":/app/subreddits.json \
+  -v "$(pwd)/sounds":/app/sounds \
+  -v "$(pwd)/data":/app/data \
+  -v "$(pwd)/logs":/app/logs \
   ghcr.io/evd09/memebot:latest
-```
-	** OR **
-```
-sudo docker pull ghcr.io/evd09/memebot:latest && docker run -d --name memebot --env-file .env -v "$(pwd)/stats.json":/app/stats.json -v "$(pwd)/cache.db":/app/cache.db ghcr.io/evd09/memebot:latest
 
 ```
-### Docker Compose ###
-1. Create directory for config files
-```
-mkdir discordmemebot
-cd discordmemebot
-```
-2. Create stat.JSON & subreddits.json & .env
-```
-touch subreddits.json
-touch stats.json
-chmod 666 stats.json
-chmod 666 subreddits.json
-```
-```
-sudo nano .env
-```
-3. Place the following and update credentials
-```
-DISCORD_TOKEN=your_discord_bot_token
-APPLICATION_ID=your_discord_application_id
-GUILD_ID=your_test_guild_id
-REDDIT_CLIENT_ID=your_reddit_client_id
-REDDIT_CLIENT_SECRET=your_reddit_client_secret
-REDDIT_USER_AGENT=discord:meme.bot:v1 (by /u/YourRedditUsername)
-COIN_NAME=Memes 💎                 # e.g. “Gold”, “Shards”, “Points”
-
-# Reward amounts (in your “coins”)
-BASE_REWARD=10       # coins every /meme or /nsfwmeme
-KEYWORD_BONUS=5      # extra if keyword matched
-DAILY_BONUS=50       # one-time daily bonuse
-```
-2. Create a docker-compose.yml
-```
-sudo nano docker-compose.yml
-```
+### 4. Or Use Docker Compose (Recommended for Easy Updates) ###
 ```
 services:
   memebot:
@@ -160,90 +163,75 @@ services:
     restart: unless-stopped
     volumes:
       - ./data:/app/data
-      - ./subreddits.json:/app/subreddits.json
-      - ./stats.json:/app/stats.json
-
-    # (Optional) Expose ports if your bot uses webhooks, etc.
+      - ./sounds:/app/sounds
+      - ./logs:/app/logs
     # ports:
-    #   - "3000:3000"
+    #   - "3000:3000"  # Optional: if you add a web UI, etc.
+  
 ```
-3. Fetch latest image and start memebot
+**Start the bot:**
 ```
-sudo docker compose pull memebot   
-sudo docker compose up -d memebot 
+sudo docker compose pull
+sudo docker compose up -d
+```
+**To upgrade:**
+```
+sudo docker compose down
+sudo docker compose pull
+sudo docker compose up -d
 ```
 ---
-## 📝 How to Add More Subreddits to `subreddits.json`
-1. **Locate the `subreddits.json` file**
-   - On your host machine (outside Docker), find the `subreddits.json` file in your project directory.  
+## 📝 How to Add or Remove Subreddits ##
+### Use Slash Commands (Recommended) ###
+Subreddits are now managed live using Discord slash commands. Changes are stored persistently in subreddits.py (not subreddits.json), and are available immediately—no need to restart the bot!
+**Add a Subreddit**
      ```
-     ls -l subreddits.json
+     /addsubreddit <name> <sfw|nsfw>
      ```
+- Example:
+	- /addsubreddit historymemes sfw
+	- /addsubreddit spicymemes nsfw
 
-2. **Open the file in a text editor**
-   - Use your preferred editor (VSCode, nano, vim, etc):
+**Remove a Subreddit**
      ```
-     nano subreddits.json
+    /removesubreddit <name>
      ```
-     or  
-     ```
-     code subreddits.json
-     ```
+- Example:
+	- /removesubreddit spicymemes
 
-3. **Edit the lists**
-   - Inside, you'll see a structure like this:
-     ```json
-     {
-       "sfw": [
-         "memes", "dankmemes", "wholesomememes", "me_irl", "funny"
-       ],
-       "nsfw": [
-         "nsfwmemes", "sexymemes", "rule34memes"
-       ]
-     }
+**See Current Lists**
      ```
-   - **Add or remove subreddit names** (as strings) inside the `"sfw"` or `"nsfw"` lists.  
-     Example: Add `"historymemes"` to SFW, and `"spicymemes"` to NSFW.
-     ```json
-     {
-       "sfw": [
-         "memes", "dankmemes", "wholesomememes", "me_irl", "funny", "historymemes"
-       ],
-       "nsfw": [
-         "nsfwmemes", "sexymemes", "rule34memes", "spicymemes"
-       ]
-     }
+	/listsubreddits
      ```
-   - **Tip:** Each subreddit should be in quotes, separated by commas.
-   - The more subreddits you add to the list, the longer it will take for the bot to query each one, which may increase the chance of hitting Reddit’s API rate limiters.
-   - You can check you JSON file with [JSON validator](https://jsonlint.com/).
-
-4. **Save the file**
-   - If using `nano`, press `Ctrl+O` to write, then `Enter`, and `Ctrl+X` to exit.
-
-5. **(If using Docker) Make sure the file is mounted into your container**
-   - Your `docker-compose.yml` or `docker run` command should have:
+- Shows the current SFW and NSFW subreddits loaded.
+**Validate Subreddits**
      ```
-     - ./subreddits.json:/app/subreddits.json
+	/validatesubreddits
      ```
-   - This ensures changes on the host are seen inside the running container.
-
-6. **Reload subreddits in the bot**
-   - Use the `/reloadsubreddits` command in your Discord server **OR** restart your bot for the changes to take effect.
-     ```
-     /reloadsubreddits
-     ```
-   - The bot should reply with the updated validation info.
-
-7. **Verify**
-   - Try `/meme` or `/nsfwmeme` with your new subreddits/keywords to check!
-
-### ⚠️ Important Notes ###
+- Checks if each subreddit actually exists and is reachable.
+---
+**⚠️ Static subreddits.py on Reboot**
+- Subreddit lists are loaded from subreddits.py when the bot starts.
+- Newly added or removed subreddits are saved persistently, but if you edit subreddits.py manually, you must restart the bot for changes to take effect.
+- Do not edit subreddits.json directly anymore—it is not used.
+**Tips & Notes**
+- There’s no more need to manually edit any JSON files for subreddit management.
+- /addsubreddit and /removesubreddit work instantly and safely.
+- For advanced editing (rarely needed), you can modify subreddits.py directly, but a bot restart is required to reload.
+---
+### ⚠️ Important Notes/🆘 Troubleshooting  ###
 - Double-check your JSON formatting! A single missing comma or quote will break loading.
 - Only add public, active subreddits. NSFW subs **must** go in `"nsfw"`, SFW in `"sfw"`.
 - If the bot reports a problem loading or validating, check your `subreddits.json` for typos or formatting errors.
-
-That’s it! You can now easily expand your meme sources any time. 🎉
+- 4006/voice join errors?
+	- Double-check your discord.py version is 2.6.0a5239+g4496df79 or newer!
+- Audio not playing?
+	- Confirm your bot has "Connect" and "Speak" permissions in Discord
+	- Use /entrance and /beep in a real voice channel, not DM
+	- All logs are in /logs/, check for details
+- File not found?
+	- Check file permissions and paths for sounds/entrances/ and sounds/beeps/
+	- File extension (e.g., .mp3, .wav) must match
 ---
 ## ⚠️ Rate Limits & Best Practices ##
 - Reddit API rate limit: ~60 requests/minute (varies). The bot enforces smart throttling with user notifications.
@@ -280,10 +268,22 @@ That’s it! You can now easily expand your meme sources any time. 🎉
 | /gamble blackjack <amount>| Interactive blackjack                                          	   |
 | /gamble lottery           | Enter today's 10-coin lottery                        				   |
 
+### Entrance/Beeps
+| Command                 | Description                               |
+| ----------------------- | ----------------------------------------- |
+| /entrance               | **Interactive UI**: Set, preview, remove  |
+| /myentrance             | Show your entrance file/volume            |
+| /setentrance <user> <f> | Admin: Set entrance for any user          |
+| /cacheinfo              | Show RAM audio cache count                |
+| /beep                   | Play a random beep sound                  |
+| /beepfile <filename>    | Play a specific beep sound (autocomplete) |
+| /listbeeps              | List all beep files                       |
+
 
 ## 🎉 Contributing & Testing ##
 - Open issues or PRs for improvements.
 - Use a test guild (GUILD_ID) to verify slash command syncing.
 - Ensure .env is configured before running.
+
 
 Happy memeing! 😄 
