@@ -1,6 +1,6 @@
 # MemeBot 4.0 — Audio, Entrances & Beeps Update #
 ---
-## NOTE: ##
+## NOTE ##
 MemeBot 4.0 requires discord.py version: 2.6.0a5239+g4496df79
 This fixes Discord 4006 session errors (audio/voice bugs) that affect all current stable versions when joining voice channels.
 ## ❤️ Credits & Notes ##
