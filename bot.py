@@ -11,6 +11,7 @@ import discord
 from discord.errors import Forbidden 
 from discord import Object
 import logging
+import importlib
 from aiohttp import web
 import json
 from discord.ext import commands
@@ -42,31 +43,54 @@ bot.config = SimpleNamespace(
 
 # Configure root logger: send to stdout, show INFO+ by default
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.DEBUG,
     format="%(asctime)s %(levelname)-8s %(name)-15s %(message)s",
 )
+
+# Configure audiobot logger: send to stdout, show INFO+ by default
+logging.getLogger("discord.voice_state").setLevel(logging.INFO)
+logging.getLogger("discord.gateway").setLevel(logging.INFO)
 
 # Create module-level logger
 log = logging.getLogger(__name__)
 async def load_extensions() -> None:
     """
-    Dynamically load all cog extensions from the cogs/ directory.
+    Dynamically load all cog extensions from the cogs/ directory, including subfolders.
     """
     log.info("🔍 Starting load_extensions()…")
-    for file in pathlib.Path("./cogs").glob("*.py"):
-        name = file.stem
-        if name == "store":
-            continue  
-        await bot.load_extension(f"cogs.{file.stem}")
-        log.info("✅ Loaded cog: %s", name)
+    for file in pathlib.Path("./cogs").rglob("*.py"):
+        if (
+            file.name == "__init__.py"
+            or file.stem in ("store", "audio_player", "audio_queue", "audio_events", "voice_error_manager")
+        ):
+            continue  # skip known non-cog module
 
-async def stats_handler(request):
-    with open("stats.json", "r") as f:
-        data = json.load(f)
-    return web.json_response(data)
+        # Convert file path to dotted module path, e.g., cogs/audio/beep.py -> cogs.audio.beep
+        relative = file.relative_to("cogs").with_suffix("")
+        module_path = ".".join(["cogs", *relative.parts])
+
+        try:
+            await bot.load_extension(module_path)
+            log.info("✅ Loaded cog: %s", module_path)
+        except Exception as e:
+            log.warning("⚠️ Failed to load cog %s: %s", module_path, e)
+
+async def cleanup_all_voice(bot):
+    for guild in bot.guilds:
+        try:
+            vc = guild.voice_client
+            if vc and vc.is_connected():
+                print(f"[STARTUP CLEANUP] Disconnecting from voice in {guild.name} ({guild.id})...")
+                await vc.disconnect(force=True)
+        except Exception as e:
+            print(f"[STARTUP CLEANUP ERROR] {guild.name}: {e}")
+
+
 
 @bot.event
 async def on_ready() -> None:
+    await cleanup_all_voice(bot)
+
     log.info(f"🚀 Logged in as {bot.user} (ID: {bot.user.id})")
     log.info("Bot is in guilds: %s", [g.id for g in bot.guilds])
     log.info("DEV_GUILD_ID = %s", DEV_GUILD_ID)
@@ -105,6 +129,14 @@ async def on_ready() -> None:
             [c.name for c in cmds_in_guild]
         )
 
+async def stats_handler(request):
+    try:
+        with open("stats.json", "r") as f:
+            data = json.load(f)
+        return web.json_response(data)
+    except Exception as e:
+        return web.json_response({"error": str(e)}, status=500)
+
 app = web.Application()
 app.router.add_get("/stats", stats_handler)
 
@@ -119,6 +151,8 @@ async def main() -> None:
     async with bot:
         await start_web()  
         await load_extensions()
+        events = importlib.import_module("cogs.audio.audio_events")
+        await events.setup(bot)
         await bot.start(TOKEN)
 
 if __name__ == "__main__":
