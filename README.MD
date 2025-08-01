@@ -31,48 +31,48 @@ This fixes Discord 4006 session errors (audio/voice bugs) that affect all curren
 ## 📁 File Structure ##
 ```
 memebot/
-├── bot.py							# Main bot entrypoint and Discord setup
+├── bot.py				   # Main bot entrypoint and Discord setup
 ├── cogs/
 │   └── audio/
-│   │   ├── audio_player.py         # Audio playback, RAM caching, and FFmpeg logic
-│   │   ├── audio_queue.py          # Smart queueing and cooldowns for all audio
-│   │   ├── beep.py                 # /beep, /beepfile, /listbeeps commands
-│   │   ├── entrance.py             # /entrance UI View (set, preview, save, remove)
-│   │   ├── constants.py            # Folder paths and config
-│	│   ├── audio_admin.py 		    # audio admin commands 
-│	│	├── audio_events.py		    # Handles audio-related Discord bot events.
-│	│	└── voice_error_manager.py  # Manages errors during voice playback.
+│       ├── audio_player.py         	   # Audio playback, RAM caching, and FFmpeg logic
+│       ├── audio_queue.py          	   # Smart queueing and cooldowns for all audio
+│       ├── beep.py               	   # /beep, /beepfile, /listbeeps commands
+│       ├── entrance.py             	   # /entrance UI View (set, preview, save, remove)
+│       ├── constants.py                   # Folder paths and config
+│	│   ├── audio_admin.py 		   # audio admin commands 
+│	│	├── audio_events.py	   # Handles audio-related Discord bot events.
+│	│	└── voice_error_manager.py # Manages errors during voice playback.
 │	│
-│	├── meme.py                		# Main meme cog with commands and API integration
-│	├── gambling.py            		# Defines Discord commands for placing bets, playing games (like Blackjack), and handling wager logic 
-│	└── economy.py            		# Provides core economy commands (e.g., balance checks, daily rewards) and interfaces with the store
+│	├── meme.py                	   # Main meme cog with commands and API integration
+│	├── gambling.py                    # Defines Discord commands for placing bets, playing games (like Blackjack), and handling wager logic 
+│	└── economy.py            	   # Provides core economy commands (e.g., balance checks, daily rewards) and interfaces with the store
 │
 ├── helpers/
-│   └── store.py               		# Abstracts read/write operations to the economy database (adds/removes user funds, queries balances) 
+│   └── store.py               		   # Abstracts read/write operations to the economy database (adds/removes user funds, queries balances) 
 │
 ├── data/
-│   └── entrance_sounds.json        # User entrance assignments (auto-managed)
-│   └── economy.db             		# SQLite database file storing all user balances, transaction history, and economy settings 
+│   └── entrance_sounds.json               # User entrance assignments (auto-managed)
+│   └── economy.db             		   # SQLite database file storing all user balances, transaction history, and economy settings 
 │
 ├── sounds/
-│   ├── beeps/                    	# Random beep SFX files
-│   └── entrances/                	# Assignable entrance files (audio/video)
+│   ├── beeps/                    	   # Random beep SFX files
+│   └── entrances/                	   # Assignable entrance files (audio/video)
 │
 ├── logs/
 │   ├── entrance.log
 │	├── audio.log 
 │   └── beep.log
 │
-├── meme_stats.py              		# Tracks meme usage, rewards, and statistics.
-├── reddit_meme.py                  # Fetches Reddit posts and extracts media.
-├── logger_setup.py	              	# Shared rotating logger
-├── log_cleanup.py                	# Scheduled log cleaner (optional)
-├── config.json                   	# (Optional) for cache settings etc.
-├── .env                          	# (Optional) for tokens/secrets
+├── meme_stats.py              		  # Tracks meme usage, rewards, and statistics.
+├── reddit_meme.py                        # Fetches Reddit posts and extracts media.
+├── logger_setup.py	              	  # Shared rotating logger
+├── log_cleanup.py                	  # Scheduled log cleaner (optional)
+├── config.json                   	  # (Optional) for cache settings etc.
+├── .env                          	  # (Optional) for tokens/secrets
 ├── requirements.txt
 ├── docker-compose.yml
 ├── Dockerfile
-└── subreddits.py            		# Stores and manages SFW/NSFW subreddit lists.
+└── subreddits.py            		  # Stores and manages SFW/NSFW subreddit lists.
 ```
 ---
 
