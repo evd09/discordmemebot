@@ -81,16 +81,23 @@ class MemeCacheService:
 
         async def fetch_fn(keyword):
             fallback_subs = ["memes", "dankmemes", "funny"]
-            results = []
-            for sub_name in fallback_subs:
-                try:
-                    sub = await self.reddit.subreddit(sub_name)
-                    async for post in sub.hot(limit=25):
-                        if keyword.lower() in (post.title or "").lower():
-                            results.append(extract_post_data(post))
-                except Exception as e:
-                    print(f"Error fetching {sub_name} for keyword {keyword}: {e}")
-            return results
+            semaphore = asyncio.Semaphore(2)
+
+            async def fetch_sub(sub_name):
+                async with semaphore:
+                    try:
+                        sub = await self.reddit.subreddit(sub_name)
+                        sub_results = []
+                        async for post in sub.hot(limit=25):
+                            if keyword.lower() in (post.title or "").lower():
+                                sub_results.append(extract_post_data(post))
+                        return sub_results
+                    except Exception as e:
+                        print(f"Error fetching {sub_name} for keyword {keyword}: {e}")
+                        return []
+
+            results = await asyncio.gather(*(fetch_sub(name) for name in fallback_subs))
+            return [item for sublist in results for item in sublist]
 
         await self.cache_mgr.refresh_keywords(keywords, fetch_fn)
 
