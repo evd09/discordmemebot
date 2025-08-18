@@ -197,26 +197,6 @@ class Beep(commands.Cog):
         await interaction.response.send_message("🎛️ Pick a beep or press Random:", view=view, ephemeral=True)
         view.message = await interaction.original_response()
 
-    @commands.hybrid_command(name="listbeeps", description="List available beep sounds.")
-    async def listbeeps(self, ctx: commands.Context):
-        files = self.get_valid_files()
-        if not files:
-            # If run as a slash command
-            if hasattr(ctx, "interaction") and ctx.interaction:
-                return await ctx.interaction.response.send_message(
-                    "⚠️ No beep sounds found.", ephemeral=True
-                )
-            # Classic command fallback: DM the user
-            return await ctx.author.send("⚠️ No beep sounds found.")
-        
-        payload = "\n".join(f"`{f}`" for f in files)
-        # If run as a slash command
-        if hasattr(ctx, "interaction") and ctx.interaction:
-            await ctx.interaction.response.send_message(payload, ephemeral=True)
-        else:
-            # Fallback for classic (prefix) commands: DM the user
-            await ctx.author.send(payload)
-
 async def setup(bot):
     await bot.add_cog(Beep(bot))
 

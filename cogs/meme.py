@@ -470,20 +470,6 @@ class Meme(commands.Cog):
             log.error("dashboard command error", exc_info=True)
             await ctx.reply("❌ Error generating dashboard.", ephemeral=True)
 
-    @commands.hybrid_command(name="listsubreddits", description="List current SFW and NSFW subreddits")
-    async def listsubreddits(self, ctx):
-        try:
-            sfw = ", ".join(get_guild_subreddits(ctx.guild.id, 'sfw')) or "None"
-            nsfw = ", ".join(get_guild_subreddits(ctx.guild.id, 'nsfw')) or "None"
-            log.info("listsubreddits: %d sfw, %d nsfw", len(get_guild_subreddits(ctx.guild.id, 'sfw')), len(get_guild_subreddits(ctx.guild.id, 'nsfw')))
-            embed = discord.Embed(title="Loaded Subreddits (per server)")
-            embed.add_field(name="SFW", value=sfw, inline=False)
-            embed.add_field(name="NSFW", value=nsfw, inline=False)
-            await ctx.reply(embed=embed, ephemeral=True)
-        except Exception:
-            log.error("listsubreddits command error", exc_info=True)
-            await ctx.reply("❌ Error listing subreddits.", ephemeral=True)
-
     @commands.hybrid_command(name="help", description="Show all available commands")
     async def help(self, ctx: commands.Context):
         """Show a list of available bot commands."""
@@ -493,26 +479,53 @@ class Meme(commands.Cog):
             color=discord.Color.blurple()
         )
 
-        # Economy
-        embed.add_field(name="`/balance`", value="Check your coin balance", inline=False)
-        embed.add_field(name="`/buy <item>`", value="Purchase a shop item", inline=False)
+        # ---------------- User Commands ----------------
+        user_cmds = [
+            "`/balance` - Check your coin balance",
+            "`/buy <item>` - Purchase a shop item",
+            "`/meme [keyword]` - Fetch a SFW meme",
+            "`/nsfwmeme [keyword]` - Fetch a NSFW meme",
+            "`/r_ <subreddit> [keyword]` - Fetch from a specific subreddit",
+            "`/dashboard` - Show stats and leaderboards",
+            "`/gamble help` - Show all available gambling games",
+            "`/gamble list` - List your recent bets and game stats",
+            "`/entrance` - Set or preview your entrance sound (full UI)",
+            "`/beeps` - Play a random beep or choose one",
+        ]
+        embed.add_field(name="User Commands", value="\n".join(user_cmds), inline=False)
 
-        # Meme
-        embed.add_field(name="`/meme [keyword]`", value="Fetch a SFW meme", inline=False)
-        embed.add_field(name="`/nsfwmeme [keyword]`", value="Fetch a NSFW meme", inline=False)
-        embed.add_field(name="`/r_ <subreddit> [keyword]`", value="Fetch from a specific subreddit", inline=False)
-        embed.add_field(name="`/dashboard`", value="Show stats and leaderboards", inline=False)
-        embed.add_field(name="`/listsubreddits`", value="List current SFW & NSFW subreddits", inline=False)
+        # ---------------- Admin Commands ----------------
+        admin_cmds = [
+            "`/memeadmin ping` - Check bot latency",
+            "`/memeadmin uptime` - Show bot uptime",
+            "`/memeadmin addsubreddit` - Add a subreddit to SFW or NSFW list",
+            "`/memeadmin removesubreddit` - Remove a subreddit from SFW or NSFW list",
+            "`/memeadmin validatesubreddits` - Validate current subreddits",
+            "`/memeadmin reset_voice_error` - Reset voice error cooldowns",
+            "`/memeadmin set_idle_timeout` - Set or disable idle timeout for voice",
+            "`/memeadmin toggle_gambling` - Enable or disable all gambling features",
+            "`/memeadmin setentrance` - Set a user's entrance sound",
+            "`/memeadmin cacheinfo` - Show the current audio cache stats",
+        ]
+        embed.add_field(name="Admin Commands", value="\n".join(admin_cmds), inline=False)
 
-        # Gamble (only help/list)
-        embed.add_field(name="`/gamble help`", value="Show all available gambling games", inline=False)
-        embed.add_field(name="`/gamble list`", value="List your recent bets and game stats", inline=False)
+        # ---------------- Dynamic Info ----------------
+        sfw = ", ".join(get_guild_subreddits(ctx.guild.id, "sfw")) or "None"
+        nsfw = ", ".join(get_guild_subreddits(ctx.guild.id, "nsfw")) or "None"
+        embed.add_field(
+            name="Loaded Subreddits",
+            value=f"**SFW:** {sfw}\n**NSFW:** {nsfw}",
+            inline=False,
+        )
 
-        # Voice / Audio
-        embed.add_field(name="`/entrance`", value="Set or preview your entrance sound (full UI)", inline=False)
-        embed.add_field(name="`/beeps`", value="Play a random beep or choose one", inline=False)
-        embed.add_field(name="`/listbeeps`", value="List available beep sounds", inline=False)
-        embed.add_field(name="`/memeadmin cacheinfo`", value="Show the current audio cache stats", inline=False)
+        beep_cog = self.bot.get_cog("Beep")
+        if beep_cog:
+            beeps = ", ".join(beep_cog.get_valid_files()) or "None"
+            embed.add_field(
+                name="Available Beeps",
+                value=beeps,
+                inline=False,
+            )
 
         await ctx.reply(embed=embed, ephemeral=True)
 
