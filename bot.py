@@ -18,6 +18,7 @@ from discord.ext import commands
 from types import SimpleNamespace
 import yaml
 from helpers.guild_subreddits import persist_cache
+from helpers import db
 
 TOKEN        = os.getenv("DISCORD_TOKEN")
 COIN_NAME    = os.getenv("COIN_NAME", "coins")
@@ -175,12 +176,14 @@ async def start_web():
 async def main() -> None:
     async with bot:
         ensure_audio_dirs()
+        await db.init()
         await start_web()
         await load_extensions()
         events = importlib.import_module("cogs.audio.audio_events")
         await events.setup(bot)
         await bot.start(TOKEN)
     # Persist guild subreddit cache after the bot has shut down
+    await db.close()
     persist_cache()
 
 if __name__ == "__main__":
