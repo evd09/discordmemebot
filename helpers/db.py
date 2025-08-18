@@ -4,6 +4,13 @@ import time
 import asyncio
 from typing import List, Optional
 
+__all__ = [
+    "init",
+    "close",
+    "register_meme_message",
+    "get_recent_post_ids",
+]
+
 import aiosqlite
 
 # Path to the SQLite database. Can be overridden via env var.
@@ -22,6 +29,7 @@ async def init() -> None:
         if _conn is not None:
             return
 
+        os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
         _conn = await aiosqlite.connect(DB_PATH)
         _conn.row_factory = aiosqlite.Row
 
@@ -55,7 +63,7 @@ async def register_meme_message(
     guild_id: int,
     url: str,
     title: str,
-    post_id: str = None,
+    post_id: Optional[str] = None,
 ) -> None:
     """Insert or update a meme message record."""
     if _conn is None:
@@ -97,5 +105,5 @@ async def get_recent_post_ids(channel_id: int, limit: int = 20) -> List[str]:
     ) as cursor:
         rows = await cursor.fetchall()
 
-    return [r["post_id"] for r in rows]
+    return [r["post_id"] for r in rows if r["post_id"]]
 
