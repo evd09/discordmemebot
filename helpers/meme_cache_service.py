@@ -42,6 +42,8 @@ class MemeCacheService:
             keyword_failures=config.get("keyword_disable_after", 1),
             keyword_ttl=config.get("keyword_disable_ttl", 900),
         )
+        self._fetch_semaphore = asyncio.Semaphore(2)
+        self._fallback_subs = ["memes", "dankmemes", "funny"]
         self._started = False
 
     async def init(self):
@@ -73,33 +75,29 @@ class MemeCacheService:
             f"⛔ Disabled keywords: {disabled}"
         )
 
+    async def _fetch_keyword_posts(self, keyword):
+        async def fetch_sub(sub_name):
+            async with self._fetch_semaphore:
+                try:
+                    sub = await self.reddit.subreddit(sub_name)
+                    sub_results = []
+                    async for post in sub.hot(limit=25):
+                        if keyword.lower() in (post.title or "").lower():
+                            sub_results.append(extract_post_data(post))
+                    return sub_results
+                except Exception as e:
+                    print(f"Error fetching {sub_name} for keyword {keyword}: {e}")
+                    return []
+
+        results = await asyncio.gather(*(fetch_sub(name) for name in self._fallback_subs))
+        return [item for sublist in results for item in sublist]
+
     @tasks.loop(seconds=600)
     async def cache_refresh_loop(self):
         keywords = self.cache_mgr.get_all_cached_keywords()
         if not keywords:
             return
-
-        async def fetch_fn(keyword):
-            fallback_subs = ["memes", "dankmemes", "funny"]
-            semaphore = asyncio.Semaphore(2)
-
-            async def fetch_sub(sub_name):
-                async with semaphore:
-                    try:
-                        sub = await self.reddit.subreddit(sub_name)
-                        sub_results = []
-                        async for post in sub.hot(limit=25):
-                            if keyword.lower() in (post.title or "").lower():
-                                sub_results.append(extract_post_data(post))
-                        return sub_results
-                    except Exception as e:
-                        print(f"Error fetching {sub_name} for keyword {keyword}: {e}")
-                        return []
-
-            results = await asyncio.gather(*(fetch_sub(name) for name in fallback_subs))
-            return [item for sublist in results for item in sublist]
-
-        await self.cache_mgr.refresh_keywords(keywords, fetch_fn)
+        await self.cache_mgr.refresh_keywords(keywords, self._fetch_keyword_posts)
 
     @tasks.loop(seconds=3600)
     async def disk_flush_loop(self):
