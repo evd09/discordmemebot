@@ -13,8 +13,6 @@ from datetime import datetime
 from typing import Optional
 from asyncprawcore import NotFound
 import asyncpraw
-from asyncpraw import Reddit
-from asyncpraw.models import Subreddit, Submission
 from helpers.guild_subreddits import (
     add_guild_subreddit,
     remove_guild_subreddit,
@@ -34,17 +32,11 @@ from meme_stats import (
 )
 from collections import defaultdict, deque
 import discord
-from discord import Embed, File
+from discord import Embed
 from discord.ext import commands, tasks
-import html
-from helpers.meme_utils import get_image_url, send_meme, get_rxddit_url, IMAGE_EXT
-import re
-import io
-import aiohttp
+from helpers.meme_utils import get_image_url, send_meme, get_rxddit_url
 from helpers.meme_cache_service import MemeCacheService
-from helpers.reddit_cache import RedditCacheManager
 from helpers.db import get_recent_post_ids, register_meme_message
-import random  
 # Refactored utilities and cache
 from reddit_meme import (
     fetch_meme      as fetch_meme_util,
@@ -104,31 +96,6 @@ class Meme(commands.Cog):
     async def on_ready(self):
         log.info("on_ready: bot is ready")
 
-    def get_rxddit_url(self, url: str) -> str:
-        if not url:
-            log.warning("get_rxddit_url: Received empty or None URL.")
-            return ""
-
-        log.debug("get_rxddit_url input=%s", url)
-
-        # Proxy image links from i.redd.it
-        m = re.match(r'https?://i\.redd\.it/(.+)', url)
-        if m:
-            proxied = f'https://i.rxddit.com/{m.group(1)}'
-            log.debug("Proxied image URL=%s", proxied)
-            return proxied
-
-        # Proxy video links from v.redd.it
-        m = re.match(r'https?://v\.redd\.it/(.+)', url)
-        if m:
-            proxied = f'https://v.rxddit.com/{m.group(1)}'
-            log.debug("Proxied video URL=%s", proxied)
-            return proxied
-
-        # Default fallback — not a proxied domain
-        log.debug("get_rxddit_url: No match, returning original URL.")
-        return url
-
     async def _send_cached(
         self,
         ctx: commands.Context,
@@ -155,7 +122,7 @@ class Meme(commands.Cog):
 
         # 2️⃣ Resolve URLs
         raw_url   = post_dict.get("media_url") or post_dict.get("url")
-        embed_url = self.get_rxddit_url(raw_url)
+        embed_url = get_rxddit_url(raw_url)
 
         # 3️⃣ Send
         sent = await send_meme(ctx, embed, embed_url, raw_url)
@@ -225,7 +192,7 @@ class Meme(commands.Cog):
         )
 
         raw_url   = get_image_url(post)
-        embed_url = self.get_rxddit_url(raw_url)
+        embed_url = get_rxddit_url(raw_url)
 
         # only apologize if they asked for keyword but got no hits
         content = None
@@ -311,7 +278,7 @@ class Meme(commands.Cog):
         )
 
         raw_url   = get_image_url(post)
-        embed_url = self.get_rxddit_url(raw_url)
+        embed_url = get_rxddit_url(raw_url)
 
         # only apologize if they asked for keyword but got no hits
         content = None
