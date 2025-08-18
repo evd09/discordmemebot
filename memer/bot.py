@@ -153,13 +153,26 @@ async def on_ready() -> None:
         log.error("❌ Failed to sync slash commands", exc_info=True)
 
     if DEV_GUILD_ID:
-        guild_obj = Object(id=DEV_GUILD_ID)
-        cmds_in_guild = await bot.tree.fetch_commands(guild=guild_obj)
-        log.info(
-            "⚙️ Commands currently in dev guild %s: %s",
-            DEV_GUILD_ID,
-            [c.name for c in cmds_in_guild]
-        )
+        guild = bot.get_guild(DEV_GUILD_ID)
+        if guild is None:
+            log.warning(
+                "Dev guild %s not accessible; skipping fetch_commands",
+                DEV_GUILD_ID,
+            )
+        else:
+            guild_obj = Object(id=DEV_GUILD_ID)
+            try:
+                cmds_in_guild = await bot.tree.fetch_commands(guild=guild_obj)
+                log.info(
+                    "⚙️ Commands currently in dev guild %s: %s",
+                    DEV_GUILD_ID,
+                    [c.name for c in cmds_in_guild],
+                )
+            except Forbidden:
+                log.warning(
+                    "Forbidden to fetch commands in dev guild %s; skipping",
+                    DEV_GUILD_ID,
+                )
 
 
 async def main() -> None:
