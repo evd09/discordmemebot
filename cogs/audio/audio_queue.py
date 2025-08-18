@@ -4,9 +4,6 @@ import random
 from collections import defaultdict, deque
 import discord
 
-def bot_in_voice(vc_channel):
-    guild = vc_channel.guild
-    return guild.voice_client and guild.voice_client.is_connected() and guild.voice_client.channel.id == vc_channel.id
 
 from .voice_error_manager import (
     is_on_cooldown, add_failure, wait_for_cooldown,
@@ -55,12 +52,6 @@ async def send_cooldown(context, msg, remaining=None):
     elif hasattr(context, "send"):
         await context.send(msg, ephemeral=True)
 
-async def queue_audio(vc_channel, user, file_path, volume, context, play_func):
-    gid = vc_channel.guild.id
-    cid = vc_channel.id
-    now = time.time()
-    last_ch = _last_channel_play[cid]
-    last_us = _last_user_play[user.id]
 
 async def queue_audio(vc_channel, user, file_path, volume, context, play_func):
     gid = vc_channel.guild.id
