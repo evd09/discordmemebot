@@ -131,10 +131,16 @@ async def on_ready() -> None:
     cmds = bot.tree.get_commands()
     log.info("Found %d application commands to sync: %s", len(cmds), [c.name for c in cmds])
 
-    # ── Step 2: copy globals (no await) ──
+    # Clear all commands to avoid lingering/deprecated entries
+    bot.tree.clear_commands(guild=None)
+    for cmd in cmds:
+        bot.tree.add_command(cmd)
+
+    guild_obj = None
     if DEV_GUILD_ID:
         log.info("Copying global commands into dev guild %s…", DEV_GUILD_ID)
         guild_obj = discord.Object(id=DEV_GUILD_ID)
+        bot.tree.clear_commands(guild=guild_obj)
         bot.tree.copy_global_to(guild=guild_obj)
 
     log.info("🔄 Syncing slash commands…")
@@ -142,6 +148,8 @@ async def on_ready() -> None:
         if DEV_GUILD_ID:
             synced = await bot.tree.sync(guild=guild_obj)
             log.info("✅ Synced %d commands to dev guild %s!", len(synced), DEV_GUILD_ID)
+            synced = await bot.tree.sync()
+            log.info("✅ Synced %d commands globally!", len(synced))
         else:
             synced = await bot.tree.sync()
             log.info("✅ Synced %d commands globally!", len(synced))
