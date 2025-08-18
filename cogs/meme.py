@@ -20,12 +20,10 @@ from meme_stats import (
     update_stats,
     track_reaction,
     get_dashboard_stats,
-    get_top_users,
-    get_top_keywords,
-    get_top_subreddits,
     get_reactions_for_message,
     get_top_reacted_memes,
 )
+from helpers.store import Store
 from collections import defaultdict, deque
 import discord
 from discord import Embed
@@ -395,33 +393,6 @@ class Meme(commands.Cog):
             log.error(f"Error in /r_ command: {e}", exc_info=True)
             await ctx.followup.send("❌ Error fetching meme from subreddit.", ephemeral=True)
 
-    @commands.hybrid_command(name="topreactions", description="Show top 5 memes by reactions")
-    async def topreactions(self, ctx):
-        log.info(f"[/topreactions] Command triggered by user {ctx.author} ({ctx.author.id})")
-        try:
-            results = await get_top_reacted_memes(5)
-            log.debug(f"[/topreactions] Raw DB results: {results!r}")
-
-            if not results:
-                log.info("[/topreactions] No meme reactions recorded yet.")
-                return await ctx.reply("No meme reactions recorded yet.", ephemeral=True)
-
-            lines = []
-            for msg_id, url, title, guild_id, channel_id, count in results:
-                log.debug(f"[/topreactions] Message {msg_id}: {count} reactions - URL: {url}")
-                msg_url = f"https://discord.com/channels/{guild_id}/{channel_id}/{msg_id}"
-                lines.append(
-                    f"[Reddit Post]({url}) | [Discord]({msg_url}) — {title} ({count} reaction{'s' if count != 1 else ''})"
-                )
-
-            await ctx.reply("\n".join(lines), ephemeral=True)
-            log.info(f"[/topreactions] Sent {len(lines)} leaderboard lines to user {ctx.author}.")
-
-        except Exception as e:
-            log.error(f"Error in /topreactions: {e}", exc_info=True)
-            await ctx.reply("❌ Error loading top reactions leaderboard.", ephemeral=True)
-
-
     @commands.hybrid_command(name="dashboard", description="Show a stats dashboard")
     async def dashboard(self, ctx):
         """Display total memes, top users, subreddits, and keywords."""
@@ -433,10 +404,19 @@ class Meme(commands.Cog):
             subs = all_stats.get("subreddit_counts", {})
             kws = all_stats.get("keyword_counts", {})
 
-            # Get top 3 users, subreddits, keywords
-            top_users = sorted(users.items(), key=lambda x: x[1], reverse=True)[:3]
-            top_subs = sorted(subs.items(), key=lambda x: x[1], reverse=True)[:3]
-            top_kws = sorted(kws.items(), key=lambda x: x[1], reverse=True)[:3]
+            # Get top users, subreddits, keywords
+            top_users = sorted(users.items(), key=lambda x: x[1], reverse=True)[:5]
+            top_subs = sorted(subs.items(), key=lambda x: x[1], reverse=True)[:5]
+            top_kws = sorted(kws.items(), key=lambda x: x[1], reverse=True)[:5]
+
+            # Top reacted memes
+            reacted = await get_top_reacted_memes(5)
+
+            # Top richest users (economy)
+            store = Store()
+            await store.init()
+            rich_rows = await store.get_top_balances(5)
+            await store.close()
 
             # Format user lines with usernames if possible, else show mention
             user_lines = []
@@ -452,6 +432,23 @@ class Meme(commands.Cog):
             sub_lines = "\n".join(f"{s}: {c}" for s, c in top_subs) or "None"
             kw_lines = "\n".join(f"{k}: {c}" for k, c in top_kws) or "None"
 
+            react_lines = []
+            for msg_id, url, title, guild_id, channel_id, count in reacted:
+                msg_url = f"https://discord.com/channels/{guild_id}/{channel_id}/{msg_id}"
+                react_lines.append(f"[{title}]({msg_url}) — {count}")
+            react_lines = "\n".join(react_lines) or "None"
+
+            coin_name = getattr(self.bot.config, "COIN_NAME", "coins")
+            rich_lines = []
+            for uid, amt in rich_rows:
+                try:
+                    member = ctx.guild.get_member(int(uid)) or await ctx.guild.fetch_member(int(uid))
+                    name = member.display_name
+                except Exception:
+                    name = f"<@{uid}>"
+                rich_lines.append(f"{name}: {amt} {coin_name}")
+            rich_lines = "\n".join(rich_lines) or "None"
+
             # Build the embed
             embed = discord.Embed(
                 title="📊 MemeBot Dashboard",
@@ -464,70 +461,14 @@ class Meme(commands.Cog):
             embed.add_field(name="🥇 Top Users",      value=user_lines,      inline=False)
             embed.add_field(name="🌐 Top Subreddits", value=sub_lines,       inline=False)
             embed.add_field(name="🔍 Top Keywords",   value=kw_lines,        inline=False)
+            embed.add_field(name="🔥 Top Reactions",  value=react_lines,     inline=False)
+            embed.add_field(name="💰 Richest Users",  value=rich_lines,      inline=False)
 
             await ctx.reply(embed=embed, ephemeral=True)
 
         except Exception:
             log.error("dashboard command error", exc_info=True)
             await ctx.reply("❌ Error generating dashboard.", ephemeral=True)
-
-    @commands.hybrid_command(name="memestats", description="Show meme usage stats")
-    async def memestats(self, ctx: commands.Context) -> None:
-        try:
-            all_stats = await get_dashboard_stats()
-            total = all_stats.get('total_memes', 0)
-            nsfw_count = all_stats.get('nsfw_memes', 0)
-            kw_counts = all_stats.get('keyword_counts', {})
-            top_kw = max(kw_counts, key=kw_counts.get) if kw_counts else 'N/A'
-            log.debug("memestats: total=%d, nsfw=%d, top_kw=%s", total, nsfw_count, top_kw)
-            await ctx.reply(
-                f"Total Memes: {total} | NSFW: {nsfw_count} | Top Keyword: {top_kw}",
-                ephemeral=True
-            )
-        except Exception:
-            log.error("Error fetching meme stats", exc_info=True)
-            await ctx.reply("❌ Error getting meme stats.", ephemeral=True)
-
-
-    @commands.hybrid_command(name="topusers", description="Show top meme users")
-    async def topusers(self, ctx):
-        try:
-            users = await get_top_users(5)
-            leaderboard = []
-            for uid, count in users:
-                try:
-                    member = await ctx.guild.fetch_member(int(uid))
-                    name = member.display_name
-                except Exception:
-                    name = uid
-                leaderboard.append(f"{name}: {count}")
-            log.info("topusers: sending %d entries", len(leaderboard))
-            await ctx.reply("\n".join(leaderboard) or "No data", ephemeral=True)
-        except Exception:
-            log.error("topusers command error", exc_info=True)
-            await ctx.reply("❌ Error showing top users.", ephemeral=True)
-
-    @commands.hybrid_command(name="topkeywords", description="Show top meme keywords")
-    async def topkeywords(self, ctx):
-        try:
-            keywords = await get_top_keywords(5)
-            leaderboard = [f"{kw}: {cnt}" for kw, cnt in keywords]
-            log.info("topkeywords: sending %d items", len(leaderboard))
-            await ctx.reply("\n".join(leaderboard) or "No data", ephemeral=True)
-        except Exception:
-            log.error("topkeywords command error", exc_info=True)
-            await ctx.reply("❌ Error showing top keywords.", ephemeral=True)
-
-    @commands.hybrid_command(name="topsubreddits", description="Show top used subreddits")
-    async def topsubreddits(self, ctx):
-        try:
-            subs = await get_top_subreddits(5)
-            leaderboard = [f"{sub}: {cnt}" for sub, cnt in subs]
-            log.info("topsubreddits: sending %d items", len(leaderboard))
-            await ctx.reply("\n".join(leaderboard) or "No data", ephemeral=True)
-        except Exception:
-            log.error("topsubreddits command error", exc_info=True)
-            await ctx.reply("❌ Error showing top subreddits.", ephemeral=True)
 
     @commands.hybrid_command(name="listsubreddits", description="List current SFW and NSFW subreddits")
     async def listsubreddits(self, ctx):
@@ -554,18 +495,13 @@ class Meme(commands.Cog):
 
         # Economy
         embed.add_field(name="`/balance`", value="Check your coin balance", inline=False)
-        embed.add_field(name="`/toprich`", value="Show top 5 richest users", inline=False)
         embed.add_field(name="`/buy <item>`", value="Purchase a shop item", inline=False)
 
         # Meme
         embed.add_field(name="`/meme [keyword]`", value="Fetch a SFW meme", inline=False)
         embed.add_field(name="`/nsfwmeme [keyword]`", value="Fetch a NSFW meme", inline=False)
         embed.add_field(name="`/r_ <subreddit> [keyword]`", value="Fetch from a specific subreddit", inline=False)
-        embed.add_field(name="`/topreactions`", value="Show top 5 memes by reactions", inline=False)
-        embed.add_field(name="`/memestats`", value="Show meme usage stats", inline=False)
-        embed.add_field(name="`/topusers`", value="Show top meme users", inline=False)
-        embed.add_field(name="`/topkeywords`", value="Show top meme keywords", inline=False)
-        embed.add_field(name="`/topsubreddits`", value="Show top used subreddits", inline=False)
+        embed.add_field(name="`/dashboard`", value="Show stats and leaderboards", inline=False)
         embed.add_field(name="`/listsubreddits`", value="List current SFW & NSFW subreddits", inline=False)
 
         # Gamble (only help/list)

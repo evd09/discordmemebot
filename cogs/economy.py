@@ -89,21 +89,6 @@ class Economy(commands.Cog):
         await ctx.reply(f"💰 You have {bal} {name}.", ephemeral=bool(ctx.interaction))
 
     @gambling_enabled_ctx()
-    @commands.hybrid_command(name="toprich", description="Top 5 richest users")
-    async def toprich(self, ctx: commands.Context):
-        rows = await self.store.get_top_balances(5)
-        name = self.bot.config.COIN_NAME
-        lines = []
-        for uid, amt in rows:
-            try:
-                m = await ctx.guild.fetch_member(int(uid))
-                display = m.display_name
-            except:
-                display = f"<@{uid}>"
-            lines.append(f"{display}: {amt} {name}")
-        await ctx.reply("\n".join(lines) or "No data yet.", ephemeral=bool(ctx.interaction))
-
-    @gambling_enabled_ctx()
     @commands.hybrid_command(name="buy", description="Purchase a shop item")
     async def buy(self, ctx: commands.Context, item: str):
         shop = {"skipcooldown": 50, "premium-sub": 200}
