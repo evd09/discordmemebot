@@ -99,8 +99,13 @@ async def set_stat(key: str, value: int) -> None:
 
 
 async def inc_stat(key: str, by: int = 1) -> None:
-    v = await get_stat(key)
-    await set_stat(key, v + by)
+    conn = _require_conn()
+    await conn.execute(
+        "INSERT INTO stats (key, value) VALUES (?, ?) "
+        "ON CONFLICT(key) DO UPDATE SET value = value + excluded.value",
+        (key, by),
+    )
+    await conn.commit()
 
 
 async def get_all_stats() -> Dict[str, int]:
