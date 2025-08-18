@@ -326,7 +326,6 @@ class Meme(commands.Cog):
         # 3) Fetch via pipeline (or random fallback)
         post = None
         random_fallback = False
-        recent_ids = await get_recent_post_ids(ctx.channel.id, limit=20)
 
         try:
             result = await fetch_meme_util(
