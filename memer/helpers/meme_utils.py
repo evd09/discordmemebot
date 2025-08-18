@@ -1,11 +1,11 @@
-import logging, io, aiohttp
+import logging
 from urllib.parse import urlparse
 from asyncpraw.models import Submission
 from html import unescape
-from discord import File
 from discord import Embed
 from typing import Optional
 from discord.ext.commands import Context
+import discord
 
 log = logging.getLogger(__name__)
 
@@ -22,18 +22,30 @@ async def send_meme(
     If embed is provided, set its image to `url` and send (embed + optional content).
     Otherwise just send the raw link (with optional content above it).
     """
-    # 1) ACK within 3s
-    if not ctx.interaction.response.is_done():
-        await ctx.interaction.response.defer()
-
-    # 2) Send either embed or plain link
     if embed:
         embed.set_image(url=url)
-        return await ctx.interaction.followup.send(content=content, embed=embed)
-    else:
-        text = f"{content}\n{url}" if content else url
-        log.debug("🔥 send_meme (plain link) → %s", text)
-        return await ctx.interaction.followup.send(content=text)
+
+    text = f"{content}\n{url}" if content else url
+
+    if getattr(ctx, "interaction", None) and not ctx.interaction.response.is_done():
+        try:
+            await ctx.interaction.response.defer()
+        except discord.errors.NotFound:
+            pass
+
+    try:
+        if getattr(ctx, "interaction", None):
+            if embed:
+                return await ctx.interaction.followup.send(content=content, embed=embed)
+            log.debug("🔥 send_meme (plain link) → %s", text)
+            return await ctx.interaction.followup.send(content=text)
+    except discord.errors.NotFound:
+        pass
+
+    if embed:
+        return await ctx.send(content=content, embed=embed)
+    log.debug("🔥 send_meme fallback (plain link) → %s", text)
+    return await ctx.send(text)
 
 def get_image_url(post: Submission) -> str:
     url = post.url
