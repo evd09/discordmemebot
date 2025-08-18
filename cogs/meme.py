@@ -129,7 +129,7 @@ class Meme(commands.Cog):
         sent = await send_meme(ctx, embed, embed_url, raw_url)
 
         # 4️⃣ Stats
-        await register_meme_message(
+        register_meme_message(
             sent.id,
             ctx.channel.id,
             ctx.guild.id,
@@ -213,7 +213,7 @@ class Meme(commands.Cog):
             )
 
         # ─── STATS & DEDUP ────────────────────────────────────
-        await register_meme_message(
+        register_meme_message(
             sent.id,
             ctx.channel.id,
             ctx.guild.id,
@@ -299,7 +299,7 @@ class Meme(commands.Cog):
             )
 
         # ─── STATS & DEDUP ────────────────────────────────────
-        await register_meme_message(
+        register_meme_message(
             sent.id,
             ctx.channel.id,
             ctx.guild.id,
@@ -385,7 +385,7 @@ class Meme(commands.Cog):
                 embed=embed
             )
 
-            await register_meme_message(
+            register_meme_message(
                 sent.id,
                 ctx.channel.id,
                 ctx.guild.id,

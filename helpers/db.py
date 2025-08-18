@@ -2,6 +2,7 @@
 import os
 import time
 import asyncio
+import contextlib
 from typing import List, Optional
 
 __all__ = [
@@ -19,11 +20,15 @@ DB_PATH = os.getenv("MEME_CACHE_DB", "data/meme_cache.db")
 # Module level connection reused by all helpers
 _conn: Optional[aiosqlite.Connection] = None
 _lock = asyncio.Lock()
+_queue: Optional[asyncio.Queue] = None
+_flusher_task: Optional[asyncio.Task] = None
+
+_FLUSH_INTERVAL = 5  # seconds
 
 
 async def init() -> None:
     """Initialize the shared aiosqlite connection and ensure tables exist."""
-    global _conn
+    global _conn, _queue, _flusher_task
 
     async with _lock:
         if _conn is not None:
@@ -48,16 +53,30 @@ async def init() -> None:
         )
         await _conn.commit()
 
+        _queue = asyncio.Queue()
+        _flusher_task = asyncio.create_task(_flusher())
+
 
 async def close() -> None:
-    """Close the shared aiosqlite connection."""
-    global _conn
+    """Flush pending records and close the shared aiosqlite connection."""
+    global _conn, _flusher_task, _queue
+
+    if _flusher_task is not None:
+        _flusher_task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await _flusher_task
+        _flusher_task = None
+
+    if _queue is not None:
+        await _flush_once()
+        _queue = None
+
     if _conn is not None:
         await _conn.close()
         _conn = None
 
 
-async def register_meme_message(
+def register_meme_message(
     message_id: str,
     channel_id: int,
     guild_id: int,
@@ -65,16 +84,11 @@ async def register_meme_message(
     title: str,
     post_id: Optional[str] = None,
 ) -> None:
-    """Insert or update a meme message record."""
-    if _conn is None:
+    """Queue a meme message record for later insertion."""
+    if _conn is None or _queue is None:
         raise RuntimeError("Database not initialized")
 
-    await _conn.execute(
-        """
-          INSERT OR REPLACE INTO meme_messages
-            (message_id, channel_id, guild_id, url, title, post_id, timestamp)
-          VALUES (?, ?, ?, ?, ?, ?, ?)
-        """,
+    _queue.put_nowait(
         (
             message_id,
             channel_id,
@@ -83,9 +97,8 @@ async def register_meme_message(
             title,
             post_id,
             int(time.time()),
-        ),
+        )
     )
-    await _conn.commit()
 
 
 async def get_recent_post_ids(channel_id: int, limit: int = 20) -> List[str]:
@@ -106,4 +119,41 @@ async def get_recent_post_ids(channel_id: int, limit: int = 20) -> List[str]:
         rows = await cursor.fetchall()
 
     return [r["post_id"] for r in rows if r["post_id"]]
+
+
+async def _flush_once() -> None:
+    """Flush all queued records in a single transaction."""
+    if _conn is None or _queue is None:
+        return
+
+    batch = []
+    while True:
+        try:
+            batch.append(_queue.get_nowait())
+        except asyncio.QueueEmpty:
+            break
+
+    if not batch:
+        return
+
+    await _conn.execute("BEGIN")
+    await _conn.executemany(
+        """
+          INSERT OR REPLACE INTO meme_messages
+            (message_id, channel_id, guild_id, url, title, post_id, timestamp)
+          VALUES (?, ?, ?, ?, ?, ?, ?)
+        """,
+        batch,
+    )
+    await _conn.commit()
+
+    for _ in batch:
+        _queue.task_done()
+
+
+async def _flusher() -> None:
+    """Background task that periodically flushes the queue."""
+    while True:
+        await asyncio.sleep(_FLUSH_INTERVAL)
+        await _flush_once()
 
