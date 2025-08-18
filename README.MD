@@ -13,15 +13,14 @@ This fixes Discord 4006 session errors (audio/voice bugs) that affect all curren
 
 - User-assigned entrance sounds (per user, with volume control)
 - Interactive /entrance UI: Discord Views, dropdown file search, volume control, preview, and save — all in one ephemeral message
-- Random /beep command: Plays a random beep SFX
-- /beepfile <filename> with autocomplete: Instantly play a chosen beep by filename, powered by fuzzy search/autocomplete
+- Interactive /beeps command: Browse or randomly play beep SFX
 - Live voice channel playback (via FFmpeg) for both entrances and beeps
 - Preview before save: Test your entrance sound/volume as much as you want
 - Voice join/leave and audio error handling: Full support for Discord’s quirks (including 4006+ error auto-retry and cooldown logic)
 - Ephemeral UI: All interactive audio commands use ephemeral responses — only you see your settings
 - Admin Tools: /setentrance <user> <filename> and /reloadentrances for admins
 - Log file rotation/cleanup: Old/large logs are deleted automatically
-- Slash command autocomplete: For entrance/beep files
+- Slash command autocomplete: For entrance files
 ---
 ## 💡 Upgrading from v3.x ##
 - New sounds/entrances/ and sounds/beeps/ folders are required for audio features
@@ -36,7 +35,7 @@ memebot/
 │   └── audio/
 │       ├── audio_player.py         	   # Audio playback, RAM caching, and FFmpeg logic
 │       ├── audio_queue.py          	   # Smart queueing and cooldowns for all audio
-│       ├── beep.py               	   # /beep, /beepfile, /listbeeps commands
+│       ├── beep.py               	   # /beeps and /listbeeps commands
 │       ├── entrance.py             	   # /entrance UI View (set, preview, save, remove)
 │       ├── constants.py                   # Folder paths and config
 │	│   ├── audio_admin.py 		   # audio admin commands 
@@ -221,7 +220,7 @@ Subreddits are now managed live using Discord slash commands.
 	- Double-check your discord.py version is 2.6.0a5239+g4496df79 or newer!
 - Audio not playing?
 	- Confirm your bot has "Connect" and "Speak" permissions in Discord
-	- Use /entrance and /beep in a real voice channel, not DM
+	- Use /entrance and /beeps in a real voice channel, not DM
 	- All logs are in /logs/, check for details
 - File not found?
 	- Check file permissions and paths for sounds/entrances/ and sounds/beeps/
@@ -269,8 +268,7 @@ Subreddits are now managed live using Discord slash commands.
 | /myentrance             | Show your entrance file/volume            |
 | /setentrance <user> <f> | Admin: Set entrance for any user          |
 | /cacheinfo              | Show RAM audio cache count                |
-| /beep                   | Play a random beep sound                  |
-| /beepfile <filename>    | Play a specific beep sound (autocomplete) |
+| /beeps                  | Play a random beep or choose one          |
 | /listbeeps              | List all beep files                       |
 
 

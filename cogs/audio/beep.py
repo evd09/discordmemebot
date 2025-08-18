@@ -41,6 +41,7 @@ class BeepPickerView(discord.ui.View):
     # ---------- UI ----------
     def _build_ui(self):
         self._add_select()
+        self._add_random_button()
         self._add_pagination()
 
     def _add_select(self):
@@ -54,7 +55,7 @@ class BeepPickerView(discord.ui.View):
         options = [discord.SelectOption(label=f) for f in self.files[start:end]]
 
         selector = discord.ui.Select(
-            placeholder="Select a beep to play",
+            placeholder="Select or search a beep to play",
             options=options,
             custom_id="beep_file_select",
             min_values=1,
@@ -93,6 +94,45 @@ class BeepPickerView(discord.ui.View):
         selector.callback = on_select
         self.add_item(selector)
 
+    def _add_random_button(self):
+        for child in list(self.children):
+            if isinstance(child, discord.ui.Button) and getattr(child, "custom_id", None) == "random_beep":
+                self.remove_item(child)
+
+        randb = discord.ui.Button(
+            label="Random",
+            style=discord.ButtonStyle.primary,
+            custom_id="random_beep",
+            row=1
+        )
+
+        async def do_random(interaction: discord.Interaction):
+            await interaction.response.defer()
+            filename = random.choice(self.files)
+            path = os.path.join(SOUND_FOLDER, filename)
+
+            ok = await queue_audio(self.channel, interaction.user, path, 1.0, interaction, play_clip)
+
+            for child in self.children:
+                child.disabled = True
+
+            if ok:
+                from .audio_events import signal_activity
+                signal_activity(interaction.guild.id)
+                text = f"🔊 Playing `{filename}`."
+            else:
+                text = "⚠️ Could not play right now (cooldown or voice issue). Try again in a few seconds."
+
+            if self.message:
+                await self.message.edit(content=text, view=self)
+            else:
+                await interaction.edit_original_response(content=text, view=self)
+
+            self.stop()
+
+        randb.callback = do_random
+        self.add_item(randb)
+
     def _add_pagination(self):
         # Clear existing pagers
         for child in list(self.children):
@@ -101,11 +141,11 @@ class BeepPickerView(discord.ui.View):
 
         if self.max_page > 0:
             prevb = discord.ui.Button(
-                label="⬅️ Prev", style=discord.ButtonStyle.secondary, custom_id="prev_page", row=1,
+                label="⬅️ Prev", style=discord.ButtonStyle.secondary, custom_id="prev_page", row=2,
                 disabled=(self.page == 0)
             )
             nextb = discord.ui.Button(
-                label="Next ➡️", style=discord.ButtonStyle.secondary, custom_id="next_page", row=1,
+                label="Next ➡️", style=discord.ButtonStyle.secondary, custom_id="next_page", row=2,
                 disabled=(self.page == self.max_page)
             )
 
@@ -133,13 +173,7 @@ class BeepPickerView(discord.ui.View):
         for child in self.children:
             child.disabled = True
         if self.message:
-            await self.message.edit(content="⏳ Picker timed out. Run `/beepselect` again.", view=self)
-
-async def _beep_autocomplete(interaction: discord.Interaction, current: str):
-    return [
-        app_commands.Choice(name=f, value=f)
-        for f in beep_cache if current.lower() in f.lower()
-    ][:25]
+            await self.message.edit(content="⏳ Picker timed out. Run `/beeps` again.", view=self)
 
 class Beep(commands.Cog):
     def __init__(self, bot):
@@ -149,33 +183,8 @@ class Beep(commands.Cog):
     def get_valid_files(self):
         return beep_cache
 
-    @app_commands.command(name="beep", description="Play a random beep sound.")
-    async def beep(self, interaction: discord.Interaction):
-        # Defer so we can edit the message later (always ephemeral)
-        await interaction.response.defer(ephemeral=True)
-        channel = getattr(interaction.user.voice, "channel", None)
-        if not channel:
-            await interaction.edit_original_response(content="❌ You must be in a voice channel.")
-            return
-
-        files = self.get_valid_files()
-        if not files:
-            await interaction.edit_original_response(content="⚠️ No beep sounds available.")
-            return
-
-        selected = random.choice(files)
-        path = os.path.join(SOUND_FOLDER, selected)
-        # Always go through queue_audio, not play_clip!
-        await queue_audio(channel, interaction.user, path, 1.0, interaction, play_clip)
-        from .audio_events import signal_activity
-        signal_activity(interaction.guild.id)
-        await interaction.edit_original_response(content=f"🔊 Beep! Playing `{selected}`.")
-
-    @app_commands.command(
-        name="beepselect",
-        description="Browse all beep sounds with pagination. Selecting a file plays immediately."
-    )
-    async def beepselect(self, interaction: discord.Interaction):
+    @app_commands.command(name="beeps", description="Play a random beep or choose one from a list.")
+    async def beeps(self, interaction: discord.Interaction):
         channel = getattr(interaction.user.voice, "channel", None)
         if not channel:
             return await interaction.response.send_message("❌ You must be in a voice channel.", ephemeral=True)
@@ -185,7 +194,7 @@ class Beep(commands.Cog):
             return await interaction.response.send_message("⚠️ No beep sounds available.", ephemeral=True)
 
         view = BeepPickerView(interaction.user, files, channel, page=0)
-        await interaction.response.send_message("🎛️ Pick a beep:", view=view, ephemeral=True)
+        await interaction.response.send_message("🎛️ Pick a beep or press Random:", view=view, ephemeral=True)
         view.message = await interaction.original_response()
 
     @commands.hybrid_command(name="listbeeps", description="List available beep sounds.")
