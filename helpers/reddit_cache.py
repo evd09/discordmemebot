@@ -1,14 +1,16 @@
 import os
-import sqlite3
 import asyncio
 import time
 from typing import Dict, List, Optional
 from collections import defaultdict
 
+import aiosqlite
 import logging
+
 log = logging.getLogger(__name__)
 
 DB_PATH = os.getenv("MEME_CACHE_DB", "data/meme_cache.db")
+
 
 class RedditCacheManager:
     def __init__(self, ram_ttl=900, disk_ttl=3600, keyword_failures=1, keyword_ttl=900):
@@ -21,13 +23,21 @@ class RedditCacheManager:
         self.disabled_keywords: Dict[str, float] = {}  # { keyword: timestamp_disabled }
         self.failed_count: Dict[str, int] = defaultdict(int)
         self.lock = asyncio.Lock()
-        self.conn = sqlite3.connect(DB_PATH)
-        self.conn.row_factory = sqlite3.Row
-        self._setup_db()
+        self.conn: Optional[aiosqlite.Connection] = None
 
-    def _setup_db(self):
-        with self.conn:
-            self.conn.execute('''
+    async def init(self):
+        self.conn = await aiosqlite.connect(DB_PATH)
+        self.conn.row_factory = aiosqlite.Row
+        await self._setup_db()
+
+    async def close(self):
+        if self.conn:
+            await self.conn.close()
+            self.conn = None
+
+    async def _setup_db(self):
+        await self.conn.execute(
+            '''
                 CREATE TABLE IF NOT EXISTS meme_cache (
                     keyword TEXT NOT NULL,
                     subreddit TEXT NOT NULL,
@@ -40,9 +50,11 @@ class RedditCacheManager:
                     created_utc INTEGER,
                     cached_at INTEGER
                 )
-            ''')
-            self.conn.execute("CREATE INDEX IF NOT EXISTS idx_keyword ON meme_cache(keyword)")
-            self.conn.execute("CREATE INDEX IF NOT EXISTS idx_cached_at ON meme_cache(cached_at)")
+            '''
+        )
+        await self.conn.execute("CREATE INDEX IF NOT EXISTS idx_keyword ON meme_cache(keyword)")
+        await self.conn.execute("CREATE INDEX IF NOT EXISTS idx_cached_at ON meme_cache(cached_at)")
+        await self.conn.commit()
 
     def is_disabled(self, keyword: str) -> bool:
         ts = self.disabled_keywords.get(keyword)
@@ -74,10 +86,11 @@ class RedditCacheManager:
             log.debug(f"[cache:RAM] MISS for {keyword!r}")
         return None
 
-    def get_from_disk(self, keyword: str) -> Optional[List[dict]]:
-        rows = self.conn.execute(
+    async def get_from_disk(self, keyword: str) -> Optional[List[dict]]:
+        async with self.conn.execute(
             "SELECT * FROM meme_cache WHERE keyword = ?", (keyword,)
-        ).fetchall()
+        ) as cursor:
+            rows = await cursor.fetchall()
         if rows:
             log.debug(f"[cache:DISK] HIT for {keyword!r} ({len(rows)} rows)")
             posts = [dict(row) for row in rows]
@@ -88,7 +101,7 @@ class RedditCacheManager:
             log.debug(f"[cache:DISK] MISS for {keyword!r}")
         return None
 
-    def save_to_disk(self, keyword: str, posts: List[dict]):
+    async def save_to_disk(self, keyword: str, posts: List[dict]):
         now = int(time.time())
 
         rows = []
@@ -106,27 +119,33 @@ class RedditCacheManager:
                 now
             ))
 
-        cur = self.conn.cursor()
+        cur = await self.conn.cursor()
         try:
-            cur.executemany('''
+            await cur.executemany(
+                '''
                 INSERT OR REPLACE INTO meme_cache
                 (keyword, subreddit, post_id, title, url, media_url, author, is_nsfw, created_utc, cached_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ''', rows)
-            self.conn.commit()
+                ''',
+                rows,
+            )
+            await self.conn.commit()
         except Exception as e:
             log.warning("Bulk insert failed: %s; retrying individually", e)
-            self.conn.rollback()
+            await self.conn.rollback()
             for row in rows:
                 try:
-                    cur.execute('''
+                    await cur.execute(
+                        '''
                         INSERT OR REPLACE INTO meme_cache
                         (keyword, subreddit, post_id, title, url, media_url, author, is_nsfw, created_utc, cached_at)
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    ''', row)
+                        ''',
+                        row,
+                    )
                 except Exception as ex:
                     log.error("Failed to cache post %s: %s", row[2], ex)
-            self.conn.commit()
+            await self.conn.commit()
 
     def record_failure(self, keyword: str) -> bool:
         self.failed_count[keyword] += 1
@@ -139,20 +158,20 @@ class RedditCacheManager:
         self.disabled_keywords.clear()
         self.failed_count.clear()
 
-    def flush_expired_disk(self, ttl_seconds: Optional[int] = None):
+    async def flush_expired_disk(self, ttl_seconds: Optional[int] = None):
         ttl = ttl_seconds or self.disk_ttl
         log.debug("[Cache] Flushing expired disk entries older than %ds", ttl)
         now = int(time.time())
         cutoff = now - ttl
 
-        cur = self.conn.cursor()
-        cur.execute("DELETE FROM meme_cache WHERE cached_at < ?", (cutoff,))
-        self.conn.commit()  # ✅ commit delete transaction first
+        cur = await self.conn.cursor()
+        await cur.execute("DELETE FROM meme_cache WHERE cached_at < ?", (cutoff,))
+        await self.conn.commit()  # ✅ commit delete transaction first
 
         # Now we can VACUUM
         try:
-            self.conn.execute("VACUUM")
-        except sqlite3.OperationalError as e:
+            await self.conn.execute("VACUUM")
+        except aiosqlite.OperationalError as e:
             log.warning("VACUUM failed: %s", e)
 
     async def refresh_keywords(self, keyword_list: List[str], fetch_fn):
@@ -162,7 +181,7 @@ class RedditCacheManager:
                     new_posts = await fetch_fn(keyword)
                     if new_posts:
                         self.cache_to_ram(keyword, new_posts)
-                        self.save_to_disk(keyword, new_posts)
+                        await self.save_to_disk(keyword, new_posts)
                 except Exception as e:
                     print(f"[Refresh] Failed to refresh {keyword}: {e}")
             self.clear_disabled()

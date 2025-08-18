@@ -84,6 +84,7 @@ class Meme(commands.Cog):
 
     def cog_unload(self):
         self._prune_cache.cancel()
+        asyncio.create_task(self.cache_service.close())
         asyncio.create_task(stop_warmup())
         observer.stop()
         log.info("MemeBot unloaded; warmup stopped and observer shut down.")
@@ -95,6 +96,7 @@ class Meme(commands.Cog):
     @commands.Cog.listener()
     async def on_ready(self):
         log.info("on_ready: bot is ready")
+        await self.cache_service.init()
 
     async def _send_cached(
         self,
@@ -669,7 +671,7 @@ class Meme(commands.Cog):
     @commands.hybrid_command(name="cacheinfo", description="Show cache stats for meme system")
     @commands.has_permissions(administrator=True)
     async def cacheinfo(self, ctx):
-        stats = self.cache_service.get_cache_info()
+        stats = await self.cache_service.get_cache_info()
         await ctx.reply(f"```\n{stats}\n```", ephemeral=True)
 
 async def setup(bot: commands.Bot) -> None:
