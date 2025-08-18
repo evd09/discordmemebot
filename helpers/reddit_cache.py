@@ -90,24 +90,43 @@ class RedditCacheManager:
 
     def save_to_disk(self, keyword: str, posts: List[dict]):
         now = int(time.time())
-        with self.conn:
-            for post in posts:
-                self.conn.execute('''
-                    INSERT OR REPLACE INTO meme_cache
-                    (keyword, subreddit, post_id, title, url, media_url, author, is_nsfw, created_utc, cached_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ''', (
-                    keyword,
-                    post.get("subreddit"),
-                    post.get("post_id"),
-                    post.get("title"),
-                    post.get("url"),
-                    post.get("media_url"),
-                    post.get("author"),
-                    int(post.get("is_nsfw", False)),
-                    int(post.get("created_utc", now)),
-                    now
-                ))
+
+        rows = []
+        for post in posts:
+            rows.append((
+                keyword,
+                post.get("subreddit"),
+                post.get("post_id"),
+                post.get("title"),
+                post.get("url"),
+                post.get("media_url"),
+                post.get("author"),
+                int(post.get("is_nsfw", False)),
+                int(post.get("created_utc", now)),
+                now
+            ))
+
+        cur = self.conn.cursor()
+        try:
+            cur.executemany('''
+                INSERT OR REPLACE INTO meme_cache
+                (keyword, subreddit, post_id, title, url, media_url, author, is_nsfw, created_utc, cached_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', rows)
+            self.conn.commit()
+        except Exception as e:
+            log.warning("Bulk insert failed: %s; retrying individually", e)
+            self.conn.rollback()
+            for row in rows:
+                try:
+                    cur.execute('''
+                        INSERT OR REPLACE INTO meme_cache
+                        (keyword, subreddit, post_id, title, url, media_url, author, is_nsfw, created_utc, cached_at)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ''', row)
+                except Exception as ex:
+                    log.error("Failed to cache post %s: %s", row[2], ex)
+            self.conn.commit()
 
     def record_failure(self, keyword: str) -> bool:
         self.failed_count[keyword] += 1
