@@ -536,6 +536,35 @@ class BlackjackView(discord.ui.View):
         except Exception:
             log.exception("Failed to disable buttons on timeout in %s", self.__class__.__name__)
 
+class GameSelect(discord.ui.Select):
+    def __init__(self, cog: "Gamble", amount: Optional[int], auto_aces: bool):
+        options = [
+            discord.SelectOption(label="Coin Flip", value="flip"),
+            discord.SelectOption(label="High-Low", value="highlow"),
+            discord.SelectOption(label="Roll", value="roll"),
+            discord.SelectOption(label="Slots", value="slots"),
+            discord.SelectOption(label="Crash", value="crash"),
+            discord.SelectOption(label="Blackjack", value="blackjack"),
+            discord.SelectOption(label="Lottery", value="lottery"),
+            discord.SelectOption(label="History", value="history"),
+            discord.SelectOption(label="Win Rate", value="winrate"),
+        ]
+        super().__init__(placeholder="Choose a game…", options=options)
+        self.cog = cog
+        self.amount = amount
+        self.auto_aces = auto_aces
+
+    async def callback(self, interaction: Interaction):
+        await self.cog._launch_game(
+            interaction, self.values[0], self.amount, self.auto_aces
+        )
+
+
+class GameSelectView(View):
+    def __init__(self, cog: "Gamble", amount: Optional[int], auto_aces: bool):
+        super().__init__(timeout=30)
+        self.add_item(GameSelect(cog, amount, auto_aces))
+
 class Gamble(commands.Cog):
     """Slash‐only gambling commands"""
 
@@ -547,24 +576,25 @@ class Gamble(commands.Cog):
     def cog_unload(self):
         self.bot.loop.create_task(self.store.close())
 
-    # 1) Define slash command group (no invoke_without_command here)
-    gamble = app_commands.Group(
-        name="gamble",
-        description="Play one of seven games"
-    )
-
-    # 2) Register a nameless subcommand to act as the “help” / fallback
     @gambling_enabled()
-    @gamble.command(
-        name="help",
-        description="Show help for all /gamble subcommands"
+    @app_commands.command(
+        name="gamble", description="Play a game of chance via menu"
     )
-    async def help(self, interaction: Interaction):
-        """Show a list of available /gamble subcommands."""
+    @app_commands.describe(
+        amount="How many coins to wager (if applicable)",
+        auto_aces="Auto-adjust Aces in blackjack",
+    )
+    async def gamble(
+        self,
+        interaction: Interaction,
+        amount: Optional[int] = None,
+        auto_aces: bool = False,
+    ):
+        """Show a menu of gambling games."""
+        self.last_gamble_channel = interaction.channel.id
+        view = GameSelectView(self, amount, auto_aces)
         await interaction.response.send_message(
-            "Available games: `flip`, `roll`, `slots`, `highlow`, `crash`, `blackjack`, `lottery`.\n"
-            "Use `/gamble <game>` to play!",
-            ephemeral=True
+            "🎰 Choose a game to play:", view=view, ephemeral=True
         )
 
     # shorthand for losing/winning bets
@@ -574,6 +604,36 @@ class Gamble(commands.Cog):
 
     async def _payout(self, uid: str, amount: int, reason: str):
         await self.store.update_balance(uid, amount, reason)
+
+    async def _launch_game(
+        self,
+        interaction: Interaction,
+        game: str,
+        amount: Optional[int],
+        auto_aces: bool,
+    ):
+        if game in {"flip", "highlow", "roll", "slots", "crash", "blackjack"} and amount is None:
+            return await interaction.response.send_message(
+                "❌ You must provide an amount for that game.", ephemeral=True
+            )
+        if game == "flip":
+            await self._flip(interaction, amount)
+        elif game == "highlow":
+            await self._highlow(interaction, amount)
+        elif game == "roll":
+            await self._roll(interaction, amount)
+        elif game == "slots":
+            await self._slots(interaction, amount)
+        elif game == "lottery":
+            await self._lottery(interaction)
+        elif game == "crash":
+            await self._crash(interaction, amount)
+        elif game == "blackjack":
+            await self._blackjack(interaction, amount, auto_aces)
+        elif game == "history":
+            await self._history(interaction)
+        elif game == "winrate":
+            await self._winrate(interaction)
 
     # ───── COG‐LEVEL ERROR HANDLER ────────────────────────────────────────────
     async def cog_app_command_error(
@@ -601,11 +661,8 @@ class Gamble(commands.Cog):
                 ephemeral=True
             )
 
-    # ─── SUBCOMMANDS ───────────────────────────────────────────────────────────
-    @gambling_enabled()
-    @gamble.command(name="flip", description="Flip a coin: win on your guess.")
-    @app_commands.describe(amount="How many coins to wager")
-    async def flip(self, interaction: Interaction, amount: int):
+    # ─── GAME LOGIC ───────────────────────────────────────────────────────────
+    async def _flip(self, interaction: Interaction, amount: int):
         self.last_gamble_channel = interaction.channel.id
         uid  = str(interaction.user.id)
         bal  = await self.store.get_balance(uid)
@@ -631,10 +688,7 @@ class Gamble(commands.Cog):
         # capture the sent message so FlipView.on_timeout can edit it
         view.message = await interaction.original_response()
 
-    @gambling_enabled()
-    @gamble.command(name="highlow", description="Guess whether the next card is higher or lower.")
-    @app_commands.describe(amount="How many coins to wager")
-    async def highlow(self, interaction: Interaction, amount: int):
+    async def _highlow(self, interaction: Interaction, amount: int):
         self.last_gamble_channel = interaction.channel.id
         uid  = str(interaction.user.id)
         bal  = await self.store.get_balance(uid)
@@ -657,10 +711,7 @@ class Gamble(commands.Cog):
             view=view, ephemeral=True
         )
 
-    @gambling_enabled()
-    @gamble.command(name="roll", description="Roll a die: win if you meet or exceed your target.")
-    @app_commands.describe(amount="How many coins to wager")
-    async def roll(self, interaction: Interaction, amount: int):
+    async def _roll(self, interaction: Interaction, amount: int):
         self.last_gamble_channel = interaction.channel.id
         uid  = str(interaction.user.id)
         bal  = await self.store.get_balance(uid)
@@ -683,13 +734,10 @@ class Gamble(commands.Cog):
             view=view, ephemeral=True
         )
 
-    @gambling_enabled()
-    @gamble.command(name="slots", description="Spin the slot machine.")
-    @app_commands.describe(amount="How many coins to wager")
-    async def slots(
+    async def _slots(
         self,
         interaction: Interaction,
-        amount: int
+        amount: int,
     ):
         self.last_gamble_channel = interaction.channel.id
         uid = str(interaction.user.id)
@@ -716,12 +764,7 @@ class Gamble(commands.Cog):
             msg = f"{line}\n😢 no match — you lose {amount}."
         await interaction.response.send_message(msg, ephemeral=True)
 
-    @gambling_enabled()
-    @gamble.command(
-        name="lottery",
-        description="Enter the daily lottery (10 coins). Draw at 00:00 bot local time."
-    )
-    async def lottery(self, interaction: Interaction):
+    async def _lottery(self, interaction: Interaction):
         self.last_gamble_channel = interaction.channel.id
         uid = str(interaction.user.id)
         cost = 10
@@ -749,10 +792,7 @@ class Gamble(commands.Cog):
             ephemeral=True
         )
 
-    @gambling_enabled()
-    @gamble.command(name="crash", description="Crash game: decide when to cash out before it crashes!")
-    @app_commands.describe(amount="How many coins to wager")
-    async def crash(self, interaction: Interaction, amount: int):
+    async def _crash(self, interaction: Interaction, amount: int):
         self.last_gamble_channel = interaction.channel.id
         uid = interaction.user.id
         balance = await self.store.get_balance(str(uid))
@@ -786,20 +826,11 @@ class Gamble(commands.Cog):
         msg = await interaction.original_response()
         await view.start()
 
-    @gambling_enabled()
-    @gamble.command(
-        name="blackjack",
-        description="Interactive blackjack: hit, stand, choose Ace value."
-    )
-    @app_commands.describe(
-        amount="How many coins to wager (1–1000)",
-        auto_aces="If true, bot auto-adjusts Aces (otherwise you pick)"
-    )
-    async def blackjack(
+    async def _blackjack(
         self,
         interaction: Interaction,
-        amount: app_commands.Range[int, 1, 1000],  # enforce 1 ≤ amount ≤ 1000
-        auto_aces: bool = False
+        amount: int,
+        auto_aces: bool = False,
     ):
         self.last_gamble_channel = interaction.channel.id
         uid = str(interaction.user.id)
@@ -823,13 +854,10 @@ class Gamble(commands.Cog):
         await interaction.response.send_message(embed=view.embed(), view=view)
         view.message = await interaction.original_response()
 
-    @gambling_enabled()
-    @gamble.command(name="history", description="Show your recent transactions")
-    @app_commands.describe(limit="How many entries to show (max 20)")
-    async def history(
+    async def _history(
         self,
         interaction: Interaction,
-        limit: Optional[int] = 10
+        limit: Optional[int] = 10,
     ):
         self.last_gamble_channel = interaction.channel.id
         limit = max(1, min(limit, 20))
@@ -852,9 +880,7 @@ class Gamble(commands.Cog):
         )
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
-    @gambling_enabled()
-    @gamble.command(name="winrate", description="Show your win/loss counts per game")
-    async def winrate(self, interaction: Interaction):
+    async def _winrate(self, interaction: Interaction):
         self.last_gamble_channel = interaction.channel.id
         uid   = str(interaction.user.id)
         stats = await self.store.get_win_loss_counts(uid)
