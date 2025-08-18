@@ -35,7 +35,7 @@ memebot/
 │   └── audio/
 │       ├── audio_player.py         	   # Audio playback, RAM caching, and FFmpeg logic
 │       ├── audio_queue.py          	   # Smart queueing and cooldowns for all audio
-│       ├── beep.py               	   # /beeps and /listbeeps commands
+│       ├── beep.py               	   # /beeps command
 │       ├── entrance.py             	   # /entrance UI View (set, preview, save, remove)
 │       ├── constants.py                   # Folder paths and config
 │	│   ├── audio_admin.py 		   # audio admin commands 
@@ -197,8 +197,8 @@ Subreddits are now managed live using Discord slash commands.
 	- Example:
 		- /removesubreddit spicymemes
 **See Current Lists**
-- /listsubreddits
-	- Shows the current SFW and NSFW subreddits loaded.
+- Use `/help`
+        - Displays the current SFW and NSFW subreddits for this server.
 **Validate Subreddits**
 - /validatesubreddits
 	- Checks if each subreddit actually exists and is reachable.
@@ -242,7 +242,6 @@ Subreddits are now managed live using Discord slash commands.
 | /r_ <subreddit> [keyword] | Fetch meme from a specific subreddit, optionally filtered by keyword |
 | /dashboard                | Show meme and economy stats & leaderboards                           |
 | /ping                     | Health check (bot alive)                                             |
-| /listsubreddits           | List loaded SFW & NSFW subreddit sources                             |
 | /reloadsubreddits         | Force refresh & validation of subreddit lists                        |
 | /ping						| Health check (bot latency)										   |
 | /uptime					| Show how long the bot has been running							   |
@@ -265,7 +264,6 @@ Subreddits are now managed live using Discord slash commands.
 | /setentrance <user> <f> | Admin: Set entrance for any user          |
 | /cacheinfo              | Show RAM audio cache count                |
 | /beeps                  | Play a random beep or choose one          |
-| /listbeeps              | List all beep files                       |
 
 
 ## 🎉 Contributing & Testing ##

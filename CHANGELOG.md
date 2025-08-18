@@ -3,7 +3,9 @@
 # Version 4.0 #
 Voice & Audio Features in MemeBot
 
-All new voice features are managed by slash commands — no file edits needed! 
+All new voice features are managed by slash commands — no file edits needed!
+
+- Removed `/listbeeps` and `/listsubreddits`; `/help` now shows available beep sounds and subreddit lists.
 
 📂 Folders & Setup
 - sounds/ — Place general sound files (for /beeps and other effects).
@@ -24,8 +26,8 @@ Both folders are auto-mounted via Docker. Supported: mp3, wav, m4a, mp4 (audio o
 Browse or Play Beeps
 /beeps
 
-List Available Beeps
-/listbeeps
+See Available Beeps
+/help
 
 🏃‍♂️ What Happens When You Join Voice?
 - If you have an entrance sound, bot joins, plays your clip (with volume you set), then leaves automatically.
