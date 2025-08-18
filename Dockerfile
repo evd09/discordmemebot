@@ -11,6 +11,17 @@ RUN apt-get update \
 
 WORKDIR /app
 
+# ── Pre-create sounds directory with permissive permissions ──
+RUN mkdir -p /app/sounds \
+    && chmod 777 /app/sounds
+
+# ── Create non-root user with configurable UID/GID ──
+ARG UID=1000
+ARG GID=1000
+RUN groupadd -g $GID app && useradd -u $UID -g app -m app
+RUN chown -R app:app /app/sounds
+USER app
+
 # ── Copy & install Python deps ──
 COPY . .
 RUN pip install --no-cache-dir -r requirements.txt
