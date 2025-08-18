@@ -1,6 +1,6 @@
 import logging
 from discord.ext import commands
-from helpers.store import Store
+from memer.helpers.store import Store
 
 log = logging.getLogger(__name__)
 

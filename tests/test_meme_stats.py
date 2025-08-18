@@ -8,9 +8,9 @@ def test_leaderboards_reflect_counts(tmp_path):
     db_path = tmp_path / "stats.db"
     os.environ["MEME_STATS_DB"] = str(db_path)
 
-    if "meme_stats" in sys.modules:
-        del sys.modules["meme_stats"]
-    meme_stats = importlib.import_module("meme_stats")
+    if "memer.meme_stats" in sys.modules:
+        del sys.modules["memer.meme_stats"]
+    meme_stats = importlib.import_module("memer.meme_stats")
 
     asyncio.run(meme_stats.init())
 

@@ -13,13 +13,13 @@ from discord import Object
 import logging
 import importlib
 
-from web.stats_server import start_stats_server
+from memer.web.stats_server import start_stats_server
 from discord.ext import commands
 from types import SimpleNamespace
 import yaml
-from helpers.guild_subreddits import persist_cache
-from helpers import db
-import meme_stats
+from memer.helpers.guild_subreddits import persist_cache
+from memer.helpers import db
+from memer import meme_stats
 
 TOKEN        = os.getenv("DISCORD_TOKEN")
 COIN_NAME    = os.getenv("COIN_NAME", "coins")
@@ -79,8 +79,9 @@ async def load_extensions() -> None:
     """
     log.info("🔍 Starting load_extensions()…")
 
+    COGS_DIR = pathlib.Path(__file__).parent / "cogs"
     module_paths = []
-    for file in pathlib.Path("./cogs").rglob("*.py"):
+    for file in COGS_DIR.rglob("*.py"):
         # Skip non-cog modules
         if (
             file.name == "__init__.py"
@@ -95,9 +96,9 @@ async def load_extensions() -> None:
         ):
             continue
 
-        # Convert file path to dotted module path, e.g., cogs/audio/beep.py -> cogs.audio.beep
-        relative = file.relative_to("cogs").with_suffix("")
-        module_paths.append(".".join(["cogs", *relative.parts]))
+        # Convert file path to dotted module path, e.g., memer/cogs/audio/beep.py -> memer.cogs.audio.beep
+        relative = file.relative_to(COGS_DIR).with_suffix("")
+        module_paths.append(".".join(["memer", "cogs", *relative.parts]))
 
     async def _load_one(module_path: str) -> None:
         try:
@@ -168,7 +169,7 @@ async def main() -> None:
         await meme_stats.init()
         await start_stats_server()
         await load_extensions()
-        events = importlib.import_module("cogs.audio.audio_events")
+        events = importlib.import_module("memer.cogs.audio.audio_events")
         await events.setup(bot)
         await bot.start(TOKEN)
     # Persist guild subreddit cache after the bot has shut down

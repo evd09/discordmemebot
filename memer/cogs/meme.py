@@ -12,27 +12,27 @@ from datetime import datetime
 from typing import Optional
 from asyncprawcore import NotFound
 import asyncpraw
-from helpers.guild_subreddits import (
+from memer.helpers.guild_subreddits import (
     get_guild_subreddits,
     DEFAULTS,
 )
-from meme_stats import (
+from memer.meme_stats import (
     update_stats,
     track_reaction,
     get_dashboard_stats,
     get_reactions_for_message,
     get_top_reacted_memes,
 )
-from helpers.store import Store
+from memer.helpers.store import Store
 from collections import defaultdict, deque
 import discord
 from discord import Embed
 from discord.ext import commands, tasks
-from helpers.meme_utils import get_image_url, send_meme, get_rxddit_url
-from helpers.meme_cache_service import MemeCacheService
-from helpers.db import get_recent_post_ids, register_meme_message
+from memer.helpers.meme_utils import get_image_url, send_meme, get_rxddit_url
+from memer.helpers.meme_cache_service import MemeCacheService
+from memer.helpers.db import get_recent_post_ids, register_meme_message
 # Refactored utilities and cache
-from reddit_meme import (
+from memer.reddit_meme import (
     fetch_meme      as fetch_meme_util,
     simple_random_meme,
     NoMemeFoundError,
@@ -40,7 +40,7 @@ from reddit_meme import (
     stop_warmup,
     WARM_CACHE,
 )
-from helpers.reddit_config import start_observer, stop_observer
+from memer.helpers.reddit_config import start_observer, stop_observer
 
 class Meme(commands.Cog):
     def __init__(self, bot: commands.Bot):

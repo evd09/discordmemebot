@@ -6,7 +6,7 @@ import discord
 from discord.ext import commands
 from discord import app_commands
 
-from helpers.guild_subreddits import (
+from memer.helpers.guild_subreddits import (
     add_guild_subreddit,
     remove_guild_subreddit,
     get_guild_subreddits,
