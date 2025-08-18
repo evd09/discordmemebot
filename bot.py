@@ -39,8 +39,7 @@ bot = commands.Bot(
 
 def ensure_audio_dirs():
     """Make sure required folders exist before any cogs initialize."""
-    os.makedirs("./sounds/beeps", exist_ok=True)
-    os.makedirs("./sounds/entrances", exist_ok=True)
+    os.makedirs("./sounds", exist_ok=True)
     os.makedirs("./data", exist_ok=True)
     os.makedirs("./logs", exist_ok=True)
 

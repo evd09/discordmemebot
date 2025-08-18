@@ -9,6 +9,7 @@ import discord
 from discord import opus
 
 from logger_setup import setup_logger
+from .constants import SOUND_FOLDER
 
 logger = setup_logger("audio", "audio.log")
 
@@ -61,15 +62,14 @@ def load_audio(path: str) -> BytesIO:
         return BytesIO(f.read())
 
 def preload_audio_clips():
-    for folder in ("./sounds/entrances", "./sounds/beeps"):
-        for file in Path(folder).glob("*"):
-            if file.suffix.lower() in AUDIO_EXTS:
-                try:
-                    buf = load_audio(str(file))
-                    audio_cache.add(str(file), buf)
-                    logger.info(f"[CACHE] Preloaded {file.name}")
-                except Exception as e:
-                    logger.warning(f"[CACHE] Could not preload {file.name}: {e}")
+    for file in Path(SOUND_FOLDER).glob("*"):
+        if file.suffix.lower() in AUDIO_EXTS:
+            try:
+                buf = load_audio(str(file))
+                audio_cache.add(str(file), buf)
+                logger.info(f"[CACHE] Preloaded {file.name}")
+            except Exception as e:
+                logger.warning(f"[CACHE] Could not preload {file.name}: {e}")
 
 async def play_clip(
     vc_channel: discord.VoiceChannel,
