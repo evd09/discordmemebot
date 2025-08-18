@@ -21,7 +21,6 @@ from helpers.guild_subreddits import (
 )
 from meme_stats import (
     update_stats,
-    register_meme_message,
     track_reaction,
     get_dashboard_stats,
     get_top_users,
@@ -214,7 +213,7 @@ class Meme(commands.Cog):
             )
 
         # ─── STATS & DEDUP ────────────────────────────────────
-        register_meme_message(
+        await register_meme_message(
             sent.id,
             ctx.channel.id,
             ctx.guild.id,
@@ -300,7 +299,7 @@ class Meme(commands.Cog):
             )
 
         # ─── STATS & DEDUP ────────────────────────────────────
-        register_meme_message(
+        await register_meme_message(
             sent.id,
             ctx.channel.id,
             ctx.guild.id,
@@ -327,7 +326,7 @@ class Meme(commands.Cog):
         # 3) Fetch via pipeline (or random fallback)
         post = None
         random_fallback = False
-        recent_ids = get_recent_post_ids(ctx.channel.id, limit=20)
+        recent_ids = await get_recent_post_ids(ctx.channel.id, limit=20)
 
         try:
             result = await fetch_meme_util(
@@ -353,7 +352,7 @@ class Meme(commands.Cog):
                 result.source_subreddit = subreddit
                 result.picked_via       = "random"
 
-            recent_ids = get_recent_post_ids(ctx.channel.id, limit=20)
+            recent_ids = await get_recent_post_ids(ctx.channel.id, limit=20)
             if post and post.id in recent_ids:
                 log.debug("🚫 recently sent, forcing fallback")
                 post = None
@@ -387,7 +386,7 @@ class Meme(commands.Cog):
                 embed=embed
             )
 
-            register_meme_message(
+            await register_meme_message(
                 sent.id,
                 ctx.channel.id,
                 ctx.guild.id,
