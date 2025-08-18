@@ -226,13 +226,13 @@ async def fetch_meme(
     from helpers.meme_utils import extract_post_data
     extract_fn = extract_fn or extract_post_data
 
+    regex = re.compile(rf'\b{re.escape(keyword.lower())}\b') if keyword else None
+
     def is_valid_post(p: Submission) -> bool:
         if not p or not getattr(p, "url", None):
             return False
-        if keyword:
-            title = (p.title or "").lower()
-            if not re.search(rf'\b{re.escape(keyword.lower())}\b', title):
-                return False
+        if regex and not regex.search((p.title or "").lower()):
+            return False
         if filters and not all(f(p) for f in filters):
             return False
         return True
