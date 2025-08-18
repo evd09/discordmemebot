@@ -248,13 +248,7 @@ Subreddits are now managed live using Discord slash commands.
 | /toggle_gambling enable:	| Enable or Disable Economy, Rewards, and gambling features			   |
 | /balance          		| Check your coin balance			                                   |
 | /buy <item> 				| Purchase a shop item  PlaceHolder									   |
-| /gamble flip <amount>     | Interactive coin flip                                   			   |
-| /gamble roll <amount>     | Interactive dice roll                                                |
-| /gamble highlow <amount>  | Interactive high-low card                             			   |
-| /gamble slots <amount>    | Spin the slots                              						   |
-| /gamble crash <amount>    | Crash game — cash out before it blows                                |
-| /gamble blackjack <amount>| Interactive blackjack                                          	   |
-| /gamble lottery           | Enter today's 10-coin lottery                        				   |
+| /gamble [amount]          | Open a game menu to play flip, roll, high-low, slots, crash, blackjack, or the lottery |
 
 ### Entrance/Beeps
 | Command                 | Description                               |
