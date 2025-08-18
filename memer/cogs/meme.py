@@ -197,6 +197,7 @@ class Meme(commands.Cog):
                 f"🔍 Sorry, I couldn’t find any memes containing `{keyword}`—"
                 " here’s a random one instead!"
             )
+            ctx._chosen_fallback = True
 
         try:
             sent = await send_meme(ctx, url=raw_url, content=content)
@@ -283,6 +284,7 @@ class Meme(commands.Cog):
                 f"🔍 Sorry, I couldn’t find any NSFW memes containing `{keyword}`—"
                 " here’s a random one instead!"
             )
+            ctx._chosen_fallback = True
 
         try:
             sent = await send_meme(ctx, url=raw_url, content=content)
