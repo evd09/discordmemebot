@@ -12,8 +12,8 @@ from discord.errors import Forbidden
 from discord import Object
 import logging
 import importlib
-from aiohttp import web
-import json
+
+from web.stats_server import start_stats_server
 from discord.ext import commands
 from types import SimpleNamespace
 import yaml
@@ -160,29 +160,12 @@ async def on_ready() -> None:
             [c.name for c in cmds_in_guild]
         )
 
-async def stats_handler(request):
-    try:
-        with open("stats.json", "r") as f:
-            data = json.load(f)
-        return web.json_response(data)
-    except Exception as e:
-        return web.json_response({"error": str(e)}, status=500)
-
-app = web.Application()
-app.router.add_get("/stats", stats_handler)
-
-async def start_web():
-    runner = web.AppRunner(app)
-    await runner.setup()
-    site = web.TCPSite(runner, "0.0.0.0", 8080)
-    await site.start()
-    log.info("Stats HTTP server running on port 8080")
 
 async def main() -> None:
     async with bot:
         ensure_audio_dirs()
         await db.init()
-        await start_web()
+        await start_stats_server()
         await load_extensions()
         events = importlib.import_module("cogs.audio.audio_events")
         await events.setup(bot)
