@@ -1,13 +1,12 @@
 # cogs/audio/audio_player.py
 
-import os
 import json
 import asyncio
-import random
 from io import BytesIO
 from pathlib import Path
+from collections import OrderedDict
 import discord
-from discord import FFmpegOpusAudio, opus
+from discord import opus
 
 from logger_setup import setup_logger
 
@@ -29,7 +28,7 @@ AUDIO_EXTS = (".mp3", ".wav", ".ogg", ".mp4", ".webm")
 class AudioCache:
     def __init__(self, max_size: int = 100):
         self.max_size = max_size
-        self.cache: dict[str, BytesIO] = {}
+        self.cache: "OrderedDict[str, BytesIO]" = OrderedDict()
 
     def load_config(self):
         cfg_path = Path("config.json")
@@ -39,14 +38,20 @@ class AudioCache:
             self.max_size = cfg.get("max_cache_size", self.max_size)
 
     def get(self, path: str) -> BytesIO | None:
-        return self.cache.get(path)
+        buf = self.cache.get(path)
+        if buf is not None:
+            # Mark as recently used
+            self.cache.move_to_end(path)
+        return buf
 
     def add(self, path: str, buf: BytesIO):
-        if len(self.cache) >= self.max_size:
-            oldest = next(iter(self.cache))
-            logger.info(f"[CACHE] Evicting {oldest}")
-            del self.cache[oldest]
+        # Insert/refresh entry
         self.cache[path] = buf
+        self.cache.move_to_end(path)
+        # Enforce cache size with LRU eviction
+        if len(self.cache) > self.max_size:
+            oldest, _ = self.cache.popitem(last=False)
+            logger.info(f"[CACHE] Evicting {oldest}")
 
 audio_cache = AudioCache()
 audio_cache.load_config()
@@ -65,8 +70,6 @@ def preload_audio_clips():
                     logger.info(f"[CACHE] Preloaded {file.name}")
                 except Exception as e:
                     logger.warning(f"[CACHE] Could not preload {file.name}: {e}")
-
-preload_audio_clips()
 
 async def play_clip(
     vc_channel: discord.VoiceChannel,
@@ -94,15 +97,16 @@ async def play_clip(
         if voice_client.is_playing():
             voice_client.stop()
 
-        # 3. Play audio (from file or buffer)
-        buf = None
-        try:
-            from .audio_queue import audio_cache
-            buf = audio_cache.get(file_path)
-        except Exception:
-            pass
+        # 3. Play audio (from cache or disk)
+        buf = audio_cache.get(file_path)
+        if buf is None:
+            try:
+                buf = load_audio(file_path)
+                audio_cache.add(file_path, buf)
+            except Exception:
+                buf = None
 
-        if buf:
+        if buf is not None:
             buf.seek(0)
             source = discord.PCMVolumeTransformer(
                 discord.FFmpegPCMAudio(buf, pipe=True), volume=volume
