@@ -240,18 +240,14 @@ Subreddits are now managed live using Discord slash commands.
 | /meme <keyword>           | Fetch a SFW meme by keyword or emoji                                 |
 | /nsfwmeme <kw>            | Fetch a NSFW meme (NSFW channel required)                            |
 | /r_ <subreddit> [keyword] | Fetch meme from a specific subreddit, optionally filtered by keyword |
-| /topreactions             | Show top 5 memes by reaction counts                                  |
+| /dashboard                | Show meme and economy stats & leaderboards                           |
 | /ping                     | Health check (bot alive)                                             |
 | /listsubreddits           | List loaded SFW & NSFW subreddit sources                             |
-| /memestats                | Show total memes, NSFW ratio, top keyword                            |
-| /topusers                 | Leaderboard of top meme requesters                                   |
-| /topsubreddits            | Most-used subreddit sources                                          |
 | /reloadsubreddits         | Force refresh & validation of subreddit lists                        |
 | /ping						| Health check (bot latency)										   |
 | /uptime					| Show how long the bot has been running							   |
 | /toggle_gambling enable:	| Enable or Disable Economy, Rewards, and gambling features			   |
 | /balance          		| Check your coin balance			                                   |
-| /toprich        			| Show top 5 richest users                   				           |
 | /buy <item> 				| Purchase a shop item  PlaceHolder									   |
 | /gamble flip <amount>     | Interactive coin flip                                   			   |
 | /gamble roll <amount>     | Interactive dice roll                                                |
