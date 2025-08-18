@@ -112,16 +112,17 @@ class Meme(commands.Cog):
         # 1️⃣ Build embed
         embed = Embed(
             title=post_dict["title"],
-            url=f"https://reddit.com{permalink}"
+            url=f"https://reddit.com{permalink}",
+            description=f"r/{post_dict['subreddit']} • u/{post_dict.get('author', '[deleted]')}"
         )
-        embed.set_footer(text=f"r/{post_dict['subreddit']} • via {via}")
+        embed.set_footer(text=f"via {via}")
 
         # 2️⃣ Resolve URLs
         raw_url   = post_dict.get("media_url") or post_dict.get("url")
         embed_url = get_rxddit_url(raw_url)
 
         # 3️⃣ Send
-        sent = await send_meme(ctx, embed, embed_url, raw_url)
+        sent = await send_meme(ctx, url=embed_url, embed=embed)
 
         # 4️⃣ Stats
         register_meme_message(
