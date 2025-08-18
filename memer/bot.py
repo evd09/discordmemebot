@@ -27,6 +27,10 @@ BASE_REWARD  = int(os.getenv("BASE_REWARD", 10))
 KEYWORD_BONUS= int(os.getenv("KEYWORD_BONUS", 5))
 DAILY_BONUS  = int(os.getenv("DAILY_BONUS", 50))
 
+# Slash commands we expect to be registered. Used for sanity checks in tests and
+# on startup to detect stray commands that should be cleaned up.
+EXPECTED_SLASH_COMMANDS = {"memeadmin", "gamble", "beeps", "entrance", "myentrance"}
+
 intents = discord.Intents.default()
 intents.message_content = True
 
@@ -129,7 +133,15 @@ async def on_ready() -> None:
 
     # Diagnostic
     cmds = bot.tree.get_commands()
-    log.info("Found %d application commands to sync: %s", len(cmds), [c.name for c in cmds])
+    cmd_names = {c.name for c in cmds}
+    log.info("Found %d application commands to sync: %s", len(cmds), list(cmd_names))
+
+    unexpected = cmd_names - EXPECTED_SLASH_COMMANDS
+    missing = EXPECTED_SLASH_COMMANDS - cmd_names
+    if unexpected:
+        log.warning("Unexpected commands detected: %s", sorted(unexpected))
+    if missing:
+        log.warning("Missing expected commands: %s", sorted(missing))
 
     # ── Step 2: copy globals (no await) ──
     if DEV_GUILD_ID:
