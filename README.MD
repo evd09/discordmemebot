@@ -237,30 +237,24 @@ Subreddits are now managed live using Discord slash commands.
 - Respect NSFW channel restrictions as per Discord guidelines.
 
 ## 🛠️ Commands Overview ##
-| Command                   | Description                                                          |
-|:--------------------------|:---------------------------------------------------------------------|
-| /help 					| List all commands													   |
-| /meme <keyword>           | Fetch a SFW meme by keyword or emoji                                 |
-| /nsfwmeme <kw>            | Fetch a NSFW meme (NSFW channel required)                            |
-| /r_ <subreddit> [keyword] | Fetch meme from a specific subreddit, optionally filtered by keyword |
-| /dashboard                | Show meme and economy stats & leaderboards                           |
-| /ping                     | Health check (bot alive)                                             |
-| /reloadsubreddits         | Force refresh & validation of subreddit lists                        |
-| /ping						| Health check (bot latency)										   |
-| /uptime					| Show how long the bot has been running							   |
-| /toggle_gambling enable:	| Enable or Disable Economy, Rewards, and gambling features			   |
-| /balance          		| Check your coin balance			                                   |
-| /buy <item> 				| Purchase a shop item  PlaceHolder									   |
-| /gamble [amount]          | Open a game menu to play flip, roll, high-low, slots, crash, blackjack, or the lottery |
+| Command                   | Description                                                                 |
+|:--------------------------|:---------------------------------------------------------------------------|
+| /help                     | List all commands                                                          |
+| /meme <keyword>           | Fetch a SFW meme by keyword or emoji                                       |
+| /nsfwmeme <keyword>       | Fetch a NSFW meme (NSFW channel required)                                  |
+| /r_ <subreddit> [keyword] | Fetch meme from a specific subreddit, optionally filtered by keyword       |
+| /dashboard                | Show meme and economy stats & leaderboards                                 |
+| /memeadmin                | Admin panel for ping, uptime, subreddit management, etc.                   |
+| /balance                  | Check your coin balance                                                    |
+| /buy <item>               | Purchase a shop item                                                       |
+| /gamble [amount]          | Play flip, roll, high-low, slots, crash, blackjack, or the lottery         |
 
 ### Entrance/Beeps
-| Command                 | Description                               |
-| ----------------------- | ----------------------------------------- |
-| /entrance               | **Interactive UI**: Set, preview, remove  |
-| /myentrance             | Show your entrance file/volume            |
-| /setentrance <user> <f> | Admin: Set entrance for any user          |
-| /cacheinfo              | Show RAM audio cache count                |
-| /beeps                  | Play a random beep or choose one          |
+| Command       | Description                             |
+|---------------|-----------------------------------------|
+| /entrance     | **Interactive UI**: Set, preview, remove|
+| /myentrance   | Show your entrance file/volume          |
+| /beeps        | Play a random beep or choose one        |
 
 
 ## 🎉 Contributing & Testing ##
