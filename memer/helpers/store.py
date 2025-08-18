@@ -13,7 +13,9 @@ class Store:
         self.db_path = db_path
         os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
         # Open a single connection we can reuse throughout the lifetime of the bot
-        self._db_task = asyncio.create_task(aiosqlite.connect(self.db_path))
+        async def _open_db():
+            return await aiosqlite.connect(self.db_path)
+        self._db_task = asyncio.create_task(_open_db())
 
     async def _db(self) -> aiosqlite.Connection:
         """Return the shared connection, awaiting its creation if needed."""
