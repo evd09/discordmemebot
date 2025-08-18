@@ -601,8 +601,7 @@ class Meme(commands.Cog):
 
         # Voice / Audio
         embed.add_field(name="`/entrance`", value="Set or preview your entrance sound (full UI)", inline=False)
-        embed.add_field(name="`/beep`", value="Play a random beep sound", inline=False)
-        embed.add_field(name="`/beepfile <filename>`", value="Play a specific beep sound by filename", inline=False)
+        embed.add_field(name="`/beeps`", value="Play a random beep or choose one", inline=False)
         embed.add_field(name="`/listbeeps`", value="List available beep sounds", inline=False)
         embed.add_field(name="`/cacheinfo`", value="Show the current audio cache stats", inline=False)
 

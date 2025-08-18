@@ -6,7 +6,7 @@ Voice & Audio Features in MemeBot
 All new voice features are managed by slash commands — no file edits needed! 
 
 📂 Folders & Setup
-- sounds/ — Place general sound files (for /beep and other effects).
+- sounds/ — Place general sound files (for /beeps and other effects).
 - entrances/ — Place custom user entrance audio/video clips here.
 
 Both folders are auto-mounted via Docker. Supported: mp3, wav, m4a, mp4 (audio only), etc.
@@ -21,11 +21,8 @@ Both folders are auto-mounted via Docker. Supported: mp3, wav, m4a, mp4 (audio o
 - Use /entrance and select “Remove” or adjust volume with the slider.
 
 🔊 Beep & Soundboard
-Play a Random Beep
-/beep
-
-Play a Specific Beep (with Autocomplete!)
-/beepfile <filename>
+Browse or Play Beeps
+/beeps
 
 List Available Beeps
 /listbeeps
