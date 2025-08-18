@@ -19,6 +19,7 @@ from types import SimpleNamespace
 import yaml
 from helpers.guild_subreddits import persist_cache
 from helpers import db
+import meme_stats
 
 TOKEN        = os.getenv("DISCORD_TOKEN")
 COIN_NAME    = os.getenv("COIN_NAME", "coins")
@@ -165,6 +166,7 @@ async def main() -> None:
     async with bot:
         ensure_audio_dirs()
         await db.init()
+        await meme_stats.init()
         await start_stats_server()
         await load_extensions()
         events = importlib.import_module("cogs.audio.audio_events")
@@ -172,6 +174,7 @@ async def main() -> None:
         await bot.start(TOKEN)
     # Persist guild subreddit cache after the bot has shut down
     await db.close()
+    await meme_stats.close()
     persist_cache()
 
 if __name__ == "__main__":
