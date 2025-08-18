@@ -24,6 +24,9 @@ class Economy(commands.Cog):
         # initialize DB tables
         bot.loop.create_task(self.store.init())
 
+    def cog_unload(self):
+        self.bot.loop.create_task(self.store.close())
+
     @commands.Cog.listener()
     async def on_command_completion(self, ctx: commands.Context):
         # only care about our two meme commands

@@ -544,6 +544,9 @@ class Gamble(commands.Cog):
         self.store = Store()
         self.last_gamble_channel = None  # Track the last used gamble channel!
 
+    def cog_unload(self):
+        self.bot.loop.create_task(self.store.close())
+
     # 1) Define slash command group (no invoke_without_command here)
     gamble = app_commands.Group(
         name="gamble",
