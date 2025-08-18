@@ -78,6 +78,8 @@ async def load_extensions() -> None:
     Dynamically load all cog extensions from the cogs/ directory, including subfolders.
     """
     log.info("🔍 Starting load_extensions()…")
+
+    module_paths = []
     for file in pathlib.Path("./cogs").rglob("*.py"):
         # Skip non-cog modules
         if (
@@ -95,13 +97,16 @@ async def load_extensions() -> None:
 
         # Convert file path to dotted module path, e.g., cogs/audio/beep.py -> cogs.audio.beep
         relative = file.relative_to("cogs").with_suffix("")
-        module_path = ".".join(["cogs", *relative.parts])
+        module_paths.append(".".join(["cogs", *relative.parts]))
 
+    async def _load_one(module_path: str) -> None:
         try:
             await bot.load_extension(module_path)
             log.info("✅ Loaded cog: %s", module_path)
         except Exception as e:
             log.warning("⚠️ Failed to load cog %s: %s", module_path, e)
+
+    await asyncio.gather(*(_load_one(path) for path in module_paths))
 
 async def cleanup_all_voice(bot):
     for guild in bot.guilds:
