@@ -244,28 +244,6 @@ class Entrance(commands.Cog):
             f"Your entrance: `{data['file']}` — Volume: {int(data.get('volume', 1.0)*100)}%", ephemeral=True
         )
 
-    async def entrance_file_autocomplete(self, interaction: discord.Interaction, current: str):
-        files = self.get_valid_files()
-        return [
-            app_commands.Choice(name=f, value=f)
-            for f in files if current.lower() in f.lower()
-        ][:25]
-
-    @app_commands.command(name="setentrance", description="(Admin) Set a user's entrance sound.")
-    @app_commands.describe(user="User to set entrance for", filename="File to set")
-    @app_commands.autocomplete(filename=entrance_file_autocomplete)
-    async def setentrance(self, interaction: discord.Interaction, user: discord.User, filename: str):
-        if not interaction.user.guild_permissions.administrator:
-            await interaction.response.send_message("You must be an admin to use this.", ephemeral=True)
-            return
-        files = self.get_valid_files()
-        if filename not in files:
-            await interaction.response.send_message("That file doesn't exist!", ephemeral=True)
-            return
-        self.entrance_data[str(user.id)] = {"file": filename, "volume": 1.0}
-        self.save_data()
-        await interaction.response.send_message(f"Set `{filename}` as entrance for {user.mention}.", ephemeral=True)
-
 
 async def setup(bot):
     await bot.add_cog(Entrance(bot))
