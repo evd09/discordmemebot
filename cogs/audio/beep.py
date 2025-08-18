@@ -5,7 +5,7 @@ import logging
 import discord
 from discord.ext import commands
 from discord import app_commands
-from .audio_player import play_clip, preload_audio_clips, audio_cache  # does NOT manage cooldowns/locks
+from .audio_player import play_clip  # does NOT manage cooldowns/locks
 from .audio_queue import queue_audio  # all logic for cooldown/locks/4006 is here
 from .constants import SOUND_FOLDER
 from logger_setup import setup_logger
@@ -216,29 +216,6 @@ class Beep(commands.Cog):
         else:
             # Fallback for classic (prefix) commands: DM the user
             await ctx.author.send(payload)
-
-    @app_commands.command(
-        name="reloadsounds",
-        description="Reload beep and entrance sound data from disk (admin only).",
-    )
-    async def reloadsounds(self, interaction: discord.Interaction):
-        if not interaction.user.guild_permissions.administrator:
-            await interaction.response.send_message(
-                "You must be an admin to reload sounds.", ephemeral=True
-            )
-            return
-
-        load_beeps()
-        entrance_cog = self.bot.get_cog("Entrance")
-        if entrance_cog and hasattr(entrance_cog, "reload_cache"):
-            entrance_cog.reload_cache()
-
-        audio_cache.cache.clear()
-        preload_audio_clips()
-
-        await interaction.response.send_message(
-            "✅ Beep and entrance sounds reloaded.", ephemeral=True
-        )
 
 async def setup(bot):
     await bot.add_cog(Beep(bot))

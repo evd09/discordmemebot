@@ -874,16 +874,6 @@ class Gamble(commands.Cog):
         )
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
-    @commands.hybrid_command(
-        name="toggle_gambling",
-        description="Enable or disable all /gamble subcommands in this server."
-    )
-    @commands.has_guild_permissions(administrator=True)
-    async def toggle_gambling(self, ctx: commands.Context, enable: bool):
-        guild_id = str(ctx.guild.id)
-        await self.store.set_gambling(guild_id, enable)
-        status = "enabled" if enable else "disabled"
-        await ctx.reply(f"✅ Gambling has been **{status}** on this server.", ephemeral=True)
 
     async def do_lottery_draw(self):
         entries = await self.store.get_today_lottery_entries()

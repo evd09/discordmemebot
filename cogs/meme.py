@@ -2,7 +2,6 @@
 import os
 import random
 import asyncio
-import time
 import logging
 
 # 🔐 Define the logger IMMEDIATELY after importing it
@@ -14,8 +13,6 @@ from typing import Optional
 from asyncprawcore import NotFound
 import asyncpraw
 from helpers.guild_subreddits import (
-    add_guild_subreddit,
-    remove_guild_subreddit,
     get_guild_subreddits,
     DEFAULTS,
 )
@@ -54,7 +51,6 @@ class Meme(commands.Cog):
             log.info("Meme cog initializing...")
         except Exception as e:
             print("[MEME COG INIT ERROR]", e)
-        self.start_time = time.time()
         self.recent_ids = defaultdict(lambda: deque(maxlen=200))
         log.info("MemeBot initialized at %s", datetime.utcnow())
 
@@ -399,29 +395,6 @@ class Meme(commands.Cog):
             log.error(f"Error in /r_ command: {e}", exc_info=True)
             await ctx.followup.send("❌ Error fetching meme from subreddit.", ephemeral=True)
 
-    @commands.hybrid_command(name="validatesubreddits", description="Validate all current subreddits in the DB")
-    @commands.has_permissions(administrator=True)
-    async def validatesubreddits(self, ctx):
-        await ctx.defer(ephemeral=True)
-        results = {"sfw": [], "nsfw": []}
-        for cat in ["sfw", "nsfw"]:
-            subs = get_guild_subreddits(ctx.guild.id, cat)
-            for sub in subs:
-                try:
-                    await self.reddit.subreddit(sub, fetch=True)
-                    status = "✅"
-                except:
-                    status = "❌"
-                results[cat].append((sub, status))
-        lines = []
-        for cat in ("sfw", "nsfw"):
-            valids = sum(1 for _, st in results[cat] if st == "✅")
-            total = len(results[cat])
-            lines.append(f"**{cat.upper()}** ({valids}/{total} valid):")
-            for name, status in results[cat]:
-                lines.append(f"{status} {name}")
-        await ctx.reply("\n".join(lines), ephemeral=True)
-
     @commands.hybrid_command(name="topreactions", description="Show top 5 memes by reactions")
     async def topreactions(self, ctx):
         log.info(f"[/topreactions] Command triggered by user {ctx.author} ({ctx.author.id})")
@@ -603,7 +576,7 @@ class Meme(commands.Cog):
         embed.add_field(name="`/entrance`", value="Set or preview your entrance sound (full UI)", inline=False)
         embed.add_field(name="`/beeps`", value="Play a random beep or choose one", inline=False)
         embed.add_field(name="`/listbeeps`", value="List available beep sounds", inline=False)
-        embed.add_field(name="`/cacheinfo`", value="Show the current audio cache stats", inline=False)
+        embed.add_field(name="`/memeadmin cacheinfo`", value="Show the current audio cache stats", inline=False)
 
         await ctx.reply(embed=embed, ephemeral=True)
 
@@ -612,43 +585,6 @@ class Meme(commands.Cog):
         log.error("Help command error", exc_info=error)
         await ctx.reply("❌ Could not show help. Please try again later.", ephemeral=True)
 
-
-    @commands.hybrid_command(name="ping", description="Check bot latency")
-    async def ping(self, ctx):
-        """Check current latency of the bot."""
-        latency_ms = round(self.bot.latency * 1000)
-        await ctx.reply(f"🏓 Pong! Latency is {latency_ms}ms", ephemeral=True)
-
-    @commands.hybrid_command(name="uptime", description="Show bot uptime")
-    async def uptime(self, ctx):
-        """Show how long the bot has been running."""
-        try:
-            elapsed = time.time() - self.start_time
-            hours, rem = divmod(int(elapsed), 3600)
-            minutes, seconds = divmod(rem, 60)
-            await ctx.reply(f"⏱️ Uptime: {hours}h {minutes}m {seconds}s", ephemeral=True)
-        except Exception:
-            log.error("uptime command error", exc_info=True)
-            await ctx.reply("❌ Error getting uptime.", ephemeral=True)
-
-    @commands.hybrid_command(name="addsubreddit", description="Add a subreddit to SFW or NSFW list.")
-    @commands.has_permissions(administrator=True)
-    async def addsubreddit(self, ctx, name: str, category: str):
-        """Add a subreddit (category must be 'sfw' or 'nsfw')."""
-        if category not in ("sfw", "nsfw"):
-            return await ctx.reply("Category must be 'sfw' or 'nsfw'.", ephemeral=True)
-        add_guild_subreddit(ctx.guild.id, name, category)
-        count = len(get_guild_subreddits(ctx.guild.id, category))
-        warning = ""
-        if count >= 40:
-            warning = f"\n⚠️ **Warning:** {category.upper()} subreddits now has {count} entries. Too many may slow the bot or hit API limits!"
-        await ctx.reply(f"✅ Added `{name}` to {category.upper()} subreddits for this server.{warning}", ephemeral=True)
-
-    @commands.hybrid_command(name="removesubreddit", description="Remove a subreddit from SFW/NSFW lists.")
-    @commands.has_permissions(administrator=True)
-    async def removesubreddit(self, ctx, name: str, category: str):
-        remove_guild_subreddit(ctx.guild.id, name, category)
-        await ctx.reply(f"✅ Removed `{name}` from the {category.upper()} subreddits list for this server.", ephemeral=True)
 
     @meme.error
     async def meme_error(self, ctx, error):
@@ -666,11 +602,6 @@ class Meme(commands.Cog):
                 "❌ Oops—something went wrong!",
                 ephemeral=True
             )
-    @commands.hybrid_command(name="cacheinfo", description="Show cache stats for meme system")
-    @commands.has_permissions(administrator=True)
-    async def cacheinfo(self, ctx):
-        stats = await self.cache_service.get_cache_info()
-        await ctx.reply(f"```\n{stats}\n```", ephemeral=True)
 
 async def setup(bot: commands.Bot) -> None:
     await bot.add_cog(Meme(bot))
