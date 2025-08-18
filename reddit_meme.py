@@ -1,67 +1,23 @@
 import random
 import asyncio
 import logging
-import os
 import re
-import yaml
-from pathlib import Path
-from typing import Optional, Callable, Sequence, List, MutableSet, Union, Dict, AsyncIterator
+from typing import Optional, Callable, Sequence, List, Union, Dict, AsyncIterator
 from dataclasses import dataclass
 from cachetools import TTLCache
 from asyncio import Semaphore
 from collections import deque
-from watchdog.observers import Observer
-from watchdog.events import FileSystemEventHandler
 from asyncpraw import Reddit
 from asyncpraw.models import Subreddit, Submission
-from helpers.meme_utils import IMAGE_EXT
+from helpers.rate_limit import throttle
+from helpers.reddit_config import CONFIG
 
 log = logging.getLogger(__name__)
 log.setLevel(logging.INFO)  # or INFO in prod
 
-# --- Simple Rate Limiter (1 request per second) ---
-_last_request = 0.0
-_rate_lock = asyncio.Lock()
-async def _throttle():
-    global _last_request
-    async with _rate_lock:
-        now = asyncio.get_event_loop().time()
-        elapsed = now - _last_request
-        wait = max(0, 1.0 - elapsed)
-        if wait:
-            log.debug("Throttling: sleeping %.3fs before next Reddit request", wait)
-            await asyncio.sleep(wait)
-        _last_request = asyncio.get_event_loop().time()
-
-# --- Dynamic, Hot-Reloadable Config ---
-CONFIG_PATH = Path(os.getenv("REDDIT_MEME_CONFIG", "reddit_meme.config.yml"))
-_CONFIG: Dict = {}
-
-def load_config():
-    global _CONFIG
-    try:
-        with open(CONFIG_PATH, 'r') as f:
-            _CONFIG = yaml.safe_load(f) or {}
-        log.info("Loaded reddit_meme config from %s: %r", CONFIG_PATH, _CONFIG)
-    except Exception as e:
-        log.warning("Failed to load config %s: %s", CONFIG_PATH, e)
-        _CONFIG = {}
-
-class _ConfigHandler(FileSystemEventHandler):
-    def on_modified(self, event):
-        if Path(event.src_path) == CONFIG_PATH:
-            log.info("Config file changed, reloading...")
-            load_config()
-
-observer = Observer()
-observer.schedule(_ConfigHandler(), path=str(CONFIG_PATH.parent), recursive=False)
-observer.daemon = True
-observer.start()
-load_config()
-
 # --- Caches & Buffers ---
-ID_CACHE = TTLCache(maxsize=_CONFIG.get('id_cache_maxsize', 10000), ttl=_CONFIG.get('id_cache_ttl', 6*3600))
-HASH_CACHE = TTLCache(maxsize=_CONFIG.get('hash_cache_maxsize', 10000), ttl=_CONFIG.get('hash_cache_ttl', 6*3600))
+ID_CACHE = TTLCache(maxsize=CONFIG.get('id_cache_maxsize', 10000), ttl=CONFIG.get('id_cache_ttl', 6*3600))
+HASH_CACHE = TTLCache(maxsize=CONFIG.get('hash_cache_maxsize', 10000), ttl=CONFIG.get('hash_cache_ttl', 6*3600))
 WARM_CACHE: Dict[str, deque] = {}
 _warmup_task: Optional[asyncio.Task] = None
 
@@ -102,7 +58,7 @@ async def _fetch_listing_with_retry(
                 limit,
                 attempt,
             )
-            await _throttle()
+            await throttle()
             count = 0
             async for p in getattr(subreddit, listing)(limit=limit):
                 count += 1
@@ -139,7 +95,7 @@ async def _fetch_concurrent(
         listing,
         len(subreddits),
     )
-    sem = Semaphore(_CONFIG.get("max_concurrent", max_concurrent))
+    sem = Semaphore(CONFIG.get("max_concurrent", max_concurrent))
 
     async def fetch_one(sub: Subreddit):
         async with sem:
@@ -188,7 +144,7 @@ async def start_warmup(
                         log.debug("Warmed buffer r/%s[%s] with %d items", name, listing, len(posts))
                 else:
                     log.warning("Warmup fetch error for %s: %s", listing, res)
-            await asyncio.sleep(_CONFIG.get("warmup_interval", interval))
+            await asyncio.sleep(CONFIG.get("warmup_interval", interval))
     _warmup_task = asyncio.create_task(_loop())
 
 async def stop_warmup():
@@ -243,8 +199,6 @@ async def simple_random_meme(reddit: Reddit, subreddit_name: str) -> Optional[Su
         )
 
     return None
-
-import re  # at the top of reddit_meme.py
 
 async def fetch_meme(
     reddit: Reddit,

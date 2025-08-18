@@ -43,9 +43,9 @@ from reddit_meme import (
     NoMemeFoundError,
     start_warmup,
     stop_warmup,
-    observer,
     WARM_CACHE,
 )
+from helpers.reddit_config import start_observer, stop_observer
 
 class Meme(commands.Cog):
     def __init__(self, bot: commands.Bot):
@@ -80,12 +80,13 @@ class Meme(commands.Cog):
         subs = DEFAULTS["sfw"] + DEFAULTS["nsfw"]
         log.debug("Scheduling warmup for subs: %s", subs)
         asyncio.create_task(start_warmup(self.reddit, subs))
+        start_observer()
 
     def cog_unload(self):
         self._prune_cache.cancel()
         asyncio.create_task(self.cache_service.close())
         asyncio.create_task(stop_warmup())
-        observer.stop()
+        stop_observer()
         log.info("MemeBot unloaded; warmup stopped and observer shut down.")
 
     @tasks.loop(seconds=60)
