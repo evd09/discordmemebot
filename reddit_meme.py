@@ -5,7 +5,7 @@ import os
 import re
 import yaml
 from pathlib import Path
-from typing import Optional, Callable, Sequence, List, MutableSet, Union, Dict
+from typing import Optional, Callable, Sequence, List, MutableSet, Union, Dict, AsyncIterator
 from dataclasses import dataclass
 from cachetools import TTLCache
 from asyncio import Semaphore
@@ -92,20 +92,41 @@ async def _fetch_listing_with_retry(
     limit: int,
     retries: int = 3,
     backoff: int = 1,
-) -> List[Submission]:
-    for attempt in range(1, retries+1):
+) -> AsyncIterator[Submission]:
+    for attempt in range(1, retries + 1):
         try:
-            log.debug("Fetching %s from r/%s (limit=%d, attempt %d)", listing, subreddit.display_name, limit, attempt)
+            log.debug(
+                "Fetching %s from r/%s (limit=%d, attempt %d)",
+                listing,
+                subreddit.display_name,
+                limit,
+                attempt,
+            )
             await _throttle()
-            posts: List[Submission] = []
+            count = 0
             async for p in getattr(subreddit, listing)(limit=limit):
-                posts.append(p)
-            log.debug("Fetched %d posts from r/%s[%s]", len(posts), subreddit.display_name, listing)
-            return posts
+                count += 1
+                yield p
+            log.debug(
+                "Fetched %d posts from r/%s[%s]",
+                count,
+                subreddit.display_name,
+                listing,
+            )
+            return
         except Exception as e:
-            log.warning("Error fetching %s from %s (attempt %d/%d): %s", listing, subreddit.display_name, attempt, retries, e)
-            await asyncio.sleep(backoff * (2 ** (attempt-1)))
-    raise RedditMemeError(f"Failed to fetch listing {listing} from {subreddit.display_name} after {retries} retries")
+            log.warning(
+                "Error fetching %s from %s (attempt %d/%d): %s",
+                listing,
+                subreddit.display_name,
+                attempt,
+                retries,
+                e,
+            )
+            await asyncio.sleep(backoff * (2 ** (attempt - 1)))
+    raise RedditMemeError(
+        f"Failed to fetch listing {listing} from {subreddit.display_name} after {retries} retries"
+    )
 
 async def _fetch_concurrent(
     subreddits: Sequence[Subreddit],
@@ -122,7 +143,7 @@ async def _fetch_concurrent(
 
     async def fetch_one(sub: Subreddit):
         async with sem:
-            posts = await _fetch_listing_with_retry(sub, listing, limit)
+            posts = [p async for p in _fetch_listing_with_retry(sub, listing, limit)]
             return sub.display_name, posts
 
     tasks = [fetch_one(sub) for sub in subreddits]
@@ -199,15 +220,27 @@ async def simple_random_meme(reddit: Reddit, subreddit_name: str) -> Optional[Su
 
     # 2️⃣ Fallback → .hot()
     try:
-        hot_posts = await _fetch_listing_with_retry(sub, "hot", limit=50)
         _exts = (".jpg", ".jpeg", ".png", ".gif", ".gifv", ".webm")
-        candidates = [p for p in hot_posts if getattr(p, "url", "").lower().endswith(_exts)]
-        if candidates:
-            choice = random.choice(candidates)
-            log.debug("simple_random_meme: got %s via .hot() on r/%s", choice.id, subreddit_name)
+        count = 0
+        choice = None
+        async for p in _fetch_listing_with_retry(sub, "hot", limit=50):
+            if getattr(p, "url", "").lower().endswith(_exts):
+                count += 1
+                if random.randrange(count) == 0:
+                    choice = p
+        if choice:
+            log.debug(
+                "simple_random_meme: got %s via .hot() on r/%s",
+                choice.id,
+                subreddit_name,
+            )
             return choice
     except Exception as e:
-        log.warning("simple_random_meme: .hot() fallback failed for r/%s: %s", subreddit_name, e)
+        log.warning(
+            "simple_random_meme: .hot() fallback failed for r/%s: %s",
+            subreddit_name,
+            e,
+        )
 
     return None
 
@@ -264,26 +297,45 @@ async def fetch_meme(
 
         # (4) Live Reddit fetch from a single randomly-chosen subreddit
         posts = []
+        chosen = None
+        count = 0
         # pick exactly one sub per invocation
         sub_to_try = random.choice(subreddits)
         try:
             s_obj = await reddit.subreddit(sub_to_try)
             for listing in listings:
-                async for post in getattr(s_obj, listing)(limit=limit):
+                async for post in _fetch_listing_with_retry(s_obj, listing, limit):
                     if is_valid_post(post):
-                        posts.append(extract_fn(post))
+                        data = extract_fn(post)
+                        posts.append(data)
+                        count += 1
+                        if random.randrange(count) == 0:
+                            chosen = data
         except Exception:
-            # if that one sub entirely fails, treat as “no posts”
             posts = []
 
         if posts:
             cache_mgr.cache_to_ram(keyword, posts)
             await cache_mgr.save_to_disk(keyword, posts)
-            chosen = random.choice(posts)
-            return MemeResult(None, chosen.get("subreddit"), "reddit", [keyword], [], "live")
+            chosen = chosen or random.choice(posts)
+            return MemeResult(
+                None,
+                chosen.get("subreddit"),
+                "reddit",
+                [keyword],
+                [],
+                "live",
+            )
         else:
             cache_mgr.record_failure(keyword)
-            return MemeResult(None, None, None, [keyword], ["no valid posts"], "fallback")
+            return MemeResult(
+                None,
+                None,
+                None,
+                [keyword],
+                ["no valid posts"],
+                "fallback",
+            )
 
         # ─── no-keyword fallback ──────────────────────────────
         tried: List[str] = []
@@ -294,7 +346,7 @@ async def fetch_meme(
             try:
                 sub_obj = await reddit.subreddit(name)
                 for listing in listings:
-                    async for post in getattr(sub_obj, listing)(limit=limit):
+                    async for post in _fetch_listing_with_retry(sub_obj, listing, limit):
                         if is_valid_post(post):
                             data = extract_fn(post)
                             return MemeResult(None, name, listing, tried, [], "fallback")
