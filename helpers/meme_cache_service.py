@@ -42,14 +42,29 @@ class MemeCacheService:
             keyword_failures=config.get("keyword_disable_after", 1),
             keyword_ttl=config.get("keyword_disable_ttl", 900),
         )
+        self._started = False
+
+    async def init(self):
+        if self._started:
+            return
+        await self.cache_mgr.init()
         self.cache_refresh_loop.start()
         self.disk_flush_loop.start()
+        self._started = True
 
-    def get_cache_info(self) -> str:
+    async def close(self):
+        if not self._started:
+            return
+        self.cache_refresh_loop.cancel()
+        self.disk_flush_loop.cancel()
+        await self.cache_mgr.close()
+        self._started = False
+
+    async def get_cache_info(self) -> str:
         ram_keywords = list(self.cache_mgr.ram_cache.keys())
         ram_posts = sum(len(v["posts"]) for v in self.cache_mgr.ram_cache.values())
-        disk_conn = self.cache_mgr.conn
-        disk_count = disk_conn.execute("SELECT COUNT(*) FROM meme_cache").fetchone()[0]
+        async with self.cache_mgr.conn.execute("SELECT COUNT(*) FROM meme_cache") as cur:
+            disk_count = (await cur.fetchone())[0]
         disabled = len(self.cache_mgr.disabled_keywords)
 
         return (
@@ -81,5 +96,5 @@ class MemeCacheService:
 
     @tasks.loop(seconds=3600)
     async def disk_flush_loop(self):
-        self.cache_mgr.flush_expired_disk(ttl_seconds=CONFIG["disk_cache_ttl"])
+        await self.cache_mgr.flush_expired_disk(ttl_seconds=CONFIG["disk_cache_ttl"])
         print("[Disk Flush] Expired disk entries cleaned up.")

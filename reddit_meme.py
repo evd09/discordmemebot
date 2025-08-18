@@ -235,7 +235,7 @@ async def fetch_meme(
                 return MemeResult(None, chosen.get("subreddit"), "cache_ram", [keyword], [], "cache")
 
         # (2) Disk cache
-        posts = cache_mgr.get_from_disk(keyword)
+        posts = await cache_mgr.get_from_disk(keyword)
         if posts:
             chosen = random.choice([p for p in posts if p.get("media_url")])
             class Cached:
@@ -265,7 +265,7 @@ async def fetch_meme(
 
         if posts:
             cache_mgr.cache_to_ram(keyword, posts)
-            cache_mgr.save_to_disk(keyword, posts)
+            await cache_mgr.save_to_disk(keyword, posts)
             chosen = random.choice(posts)
             return MemeResult(None, chosen.get("subreddit"), "reddit", [keyword], [], "live")
         else:
