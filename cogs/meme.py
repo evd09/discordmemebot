@@ -136,7 +136,7 @@ class Meme(commands.Cog):
             f"https://reddit.com{permalink}",
             post_dict["title"]
         )
-        update_stats(ctx.author.id, keyword or "", post_dict["subreddit"], nsfw=False)
+        await update_stats(ctx.author.id, keyword or "", post_dict["subreddit"], nsfw=False)
 
     @commands.Cog.listener()
     async def on_reaction_add(self, reaction, user):
@@ -221,7 +221,7 @@ class Meme(commands.Cog):
             post.title,
             post_id=post.id
         )
-        update_stats(ctx.author.id, keyword or "", result.source_subreddit, nsfw=False)
+        await update_stats(ctx.author.id, keyword or "", result.source_subreddit, nsfw=False)
 
     @commands.hybrid_command(
         name="nsfwmeme",
@@ -307,7 +307,7 @@ class Meme(commands.Cog):
             post.title,
             post_id=post.id
         )
-        update_stats(ctx.author.id, keyword or "", result.source_subreddit, nsfw=True)
+        await update_stats(ctx.author.id, keyword or "", result.source_subreddit, nsfw=True)
 
     @commands.hybrid_command(name="r_", description="Fetch a meme from a specific subreddit")
     async def r_(self, ctx: commands.Context, subreddit: str, keyword: Optional[str] = None):
@@ -394,7 +394,7 @@ class Meme(commands.Cog):
                 post.title,
                 post_id=post.id
             )
-            update_stats(ctx.author.id, keyword or "", result.source_subreddit, nsfw=False)
+            await update_stats(ctx.author.id, keyword or "", result.source_subreddit, nsfw=False)
         except Exception as e:
             log.error(f"Error in /r_ command: {e}", exc_info=True)
             await ctx.followup.send("❌ Error fetching meme from subreddit.", ephemeral=True)
@@ -426,7 +426,7 @@ class Meme(commands.Cog):
     async def topreactions(self, ctx):
         log.info(f"[/topreactions] Command triggered by user {ctx.author} ({ctx.author.id})")
         try:
-            results = get_top_reacted_memes(5)
+            results = await get_top_reacted_memes(5)
             log.debug(f"[/topreactions] Raw DB results: {results!r}")
 
             if not results:
@@ -453,7 +453,7 @@ class Meme(commands.Cog):
     async def dashboard(self, ctx):
         """Display total memes, top users, subreddits, and keywords."""
         try:
-            all_stats = get_dashboard_stats()
+            all_stats = await get_dashboard_stats()
             total = all_stats.get("total_memes", 0)
             nsfw = all_stats.get("nsfw_memes", 0)
             users = all_stats.get("user_counts", {})
@@ -501,7 +501,7 @@ class Meme(commands.Cog):
     @commands.hybrid_command(name="memestats", description="Show meme usage stats")
     async def memestats(self, ctx: commands.Context) -> None:
         try:
-            all_stats = get_dashboard_stats()
+            all_stats = await get_dashboard_stats()
             total = all_stats.get('total_memes', 0)
             nsfw_count = all_stats.get('nsfw_memes', 0)
             kw_counts = all_stats.get('keyword_counts', {})
@@ -519,7 +519,7 @@ class Meme(commands.Cog):
     @commands.hybrid_command(name="topusers", description="Show top meme users")
     async def topusers(self, ctx):
         try:
-            users = get_top_users(5)
+            users = await get_top_users(5)
             leaderboard = []
             for uid, count in users:
                 try:
@@ -537,7 +537,7 @@ class Meme(commands.Cog):
     @commands.hybrid_command(name="topkeywords", description="Show top meme keywords")
     async def topkeywords(self, ctx):
         try:
-            keywords = get_top_keywords(5)
+            keywords = await get_top_keywords(5)
             leaderboard = [f"{kw}: {cnt}" for kw, cnt in keywords]
             log.info("topkeywords: sending %d items", len(leaderboard))
             await ctx.reply("\n".join(leaderboard) or "No data", ephemeral=True)
@@ -548,7 +548,7 @@ class Meme(commands.Cog):
     @commands.hybrid_command(name="topsubreddits", description="Show top used subreddits")
     async def topsubreddits(self, ctx):
         try:
-            subs = get_top_subreddits(5)
+            subs = await get_top_subreddits(5)
             leaderboard = [f"{sub}: {cnt}" for sub, cnt in subs]
             log.info("topsubreddits: sending %d items", len(leaderboard))
             await ctx.reply("\n".join(leaderboard) or "No data", ephemeral=True)
