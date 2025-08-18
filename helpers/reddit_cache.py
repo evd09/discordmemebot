@@ -176,14 +176,22 @@ class RedditCacheManager:
 
     async def refresh_keywords(self, keyword_list: List[str], fetch_fn):
         async with self.lock:
-            for keyword in keyword_list:
-                try:
+            sem = asyncio.Semaphore(5)
+
+            async def refresh_one(keyword: str):
+                async with sem:
                     new_posts = await fetch_fn(keyword)
                     if new_posts:
                         self.cache_to_ram(keyword, new_posts)
                         await self.save_to_disk(keyword, new_posts)
-                except Exception as e:
-                    print(f"[Refresh] Failed to refresh {keyword}: {e}")
+
+            tasks = [asyncio.create_task(refresh_one(keyword)) for keyword in keyword_list]
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+
+            for keyword, result in zip(keyword_list, results):
+                if isinstance(result, Exception):
+                    print(f"[Refresh] Failed to refresh {keyword}: {result}")
+
             self.clear_disabled()
 
     def get_all_cached_keywords(self) -> List[str]:
