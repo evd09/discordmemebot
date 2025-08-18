@@ -62,10 +62,12 @@ memebot/
 │	├── audio.log 
 │   └── beep.log
 │
-├── meme_stats.py              		  # Tracks meme usage, rewards, and statistics.
+├── meme_stats.py                         # Tracks meme usage, rewards, and statistics.
 ├── reddit_meme.py                        # Fetches Reddit posts and extracts media.
-├── logger_setup.py	              	  # Shared rotating logger
-├── log_cleanup.py                	  # Scheduled log cleaner (optional)
+├── scripts/
+│   ├── log_cleanup.py                     # Scheduled log cleaner (optional)
+│   └── benchmarks/
+│       └── cache_refresh_benchmark.py     # Cache refresh benchmark (developer use)
 ├── config.json                   	  # (Optional) for cache settings etc.
 ├── .env                          	  # (Optional) for tokens/secrets
 ├── requirements.txt
