@@ -187,8 +187,8 @@ sudo docker compose up -d
 ---
 ## 📝 How to Add or Remove Subreddits ##
 ### Use Slash Commands (Recommended) ###
-Subreddits are now managed live using Discord slash commands. 
-	- Changes are stored persistently in subreddits.py (not subreddits.json), and are available immediately no need to restart the bot!
+Subreddit management is handled through `/memeadmin` buttons or automatic refreshes.
+        - Changes are stored persistently in subreddits.py (not subreddits.json) and are available immediately with no bot restart needed!
 
 **Add a Subreddit**
 - /addsubreddit <name> <sfw|nsfw>
