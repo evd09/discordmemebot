@@ -8,7 +8,10 @@ from watchdog.events import FileSystemEventHandler
 
 log = logging.getLogger(__name__)
 
-CONFIG_PATH = Path(os.getenv("REDDIT_MEME_CONFIG", "reddit_meme.config.yml"))
+DEFAULT_CONFIG_PATH = (
+    Path(__file__).resolve().parents[2] / "config" / "reddit_meme.config.yml"
+)
+CONFIG_PATH = Path(os.getenv("REDDIT_MEME_CONFIG") or DEFAULT_CONFIG_PATH)
 CONFIG: Dict = {}
 
 def load_config() -> None:

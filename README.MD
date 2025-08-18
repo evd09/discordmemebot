@@ -79,7 +79,8 @@ memebot/
 
 - Place beep sounds in sounds/beeps/
 - Place entrance files in sounds/entrances/
-	- (mp3, wav, ogg, mp4, webm supported)
+        - (mp3, wav, ogg, mp4, webm supported)
+- Customize Reddit meme fetching via `config/reddit_meme.config.yml`
 	
 
 ## 📦 Requirements ##
