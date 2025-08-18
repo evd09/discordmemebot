@@ -6,3 +6,6 @@ aiosqlite
 fuzzywuzzy
 python-Levenshtein
 aiohttp
+cachetools>=5.0
+watchdog>=2.0
+PyYAML>=6.0
