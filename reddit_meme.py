@@ -112,20 +112,32 @@ async def _fetch_concurrent(
     listing: str,
     limit: int,
     max_concurrent: int = 5,
-) -> List[Submission]:
-    log.debug("Starting concurrent fetch for listing=%s across %d subreddits", listing, len(subreddits))
-    sem = Semaphore(_CONFIG.get('max_concurrent', max_concurrent))
+) -> Dict[str, List[Submission]]:
+    log.debug(
+        "Starting concurrent fetch for listing=%s across %d subreddits",
+        listing,
+        len(subreddits),
+    )
+    sem = Semaphore(_CONFIG.get("max_concurrent", max_concurrent))
+
     async def fetch_one(sub: Subreddit):
         async with sem:
-            return await _fetch_listing_with_retry(sub, listing, limit)
+            posts = await _fetch_listing_with_retry(sub, listing, limit)
+            return sub.display_name, posts
+
     tasks = [fetch_one(sub) for sub in subreddits]
     results = await asyncio.gather(*tasks, return_exceptions=True)
-    posts: List[Submission] = []
+    posts_by_sub: Dict[str, List[Submission]] = {}
     for r in results:
-        if isinstance(r, list):
-            posts.extend(r)
-    log.debug("Concurrent fetch for %s returned %d total posts", listing, len(posts))
-    return posts
+        if isinstance(r, tuple):
+            name, posts = r
+            posts_by_sub[name] = posts
+    log.debug(
+        "Concurrent fetch for %s returned posts for %d subreddits",
+        listing,
+        len(posts_by_sub),
+    )
+    return posts_by_sub
 
 # --- Warmup Buffers ---
 async def start_warmup(
@@ -146,15 +158,16 @@ async def start_warmup(
         subs.append(reddit.subreddit(name))  # lazy Subreddit obj
     async def _loop():
         while True:
-            for listing in listings:
-                for sub in subs:
-                    try:
-                        posts = await _fetch_listing_with_retry(sub, listing, limit)
-                        WARM_CACHE[f"{sub.display_name}_{listing}"] = deque(posts, maxlen=limit)
-                        log.debug("Warmed buffer r/%s[%s] with %d items", sub.display_name, listing, len(posts))
-                    except Exception as e:
-                        log.warning("Warmup fetch error %s on %s: %s", listing, sub.display_name, e)
-            await asyncio.sleep(_CONFIG.get('warmup_interval', interval))
+            tasks = [_fetch_concurrent(subs, listing, limit) for listing in listings]
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+            for listing, res in zip(listings, results):
+                if isinstance(res, dict):
+                    for name, posts in res.items():
+                        WARM_CACHE[f"{name}_{listing}"] = deque(posts, maxlen=limit)
+                        log.debug("Warmed buffer r/%s[%s] with %d items", name, listing, len(posts))
+                else:
+                    log.warning("Warmup fetch error for %s: %s", listing, res)
+            await asyncio.sleep(_CONFIG.get("warmup_interval", interval))
     _warmup_task = asyncio.create_task(_loop())
 
 async def stop_warmup():
