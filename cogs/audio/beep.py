@@ -5,12 +5,25 @@ import logging
 import discord
 from discord.ext import commands
 from discord import app_commands
-from .audio_player import play_clip  # does NOT manage cooldowns/locks
+from .audio_player import play_clip, preload_audio_clips, audio_cache  # does NOT manage cooldowns/locks
 from .audio_queue import queue_audio  # all logic for cooldown/locks/4006 is here
+from .constants import SOUND_FOLDER
 from logger_setup import setup_logger
 
 logger = setup_logger("beep", "beep.log")
-BEEP_FOLDER = "./sounds/beeps"
+
+beep_cache: list[str] = []
+
+
+def load_beeps() -> list[str]:
+    """Load available beep files into cache."""
+    os.makedirs(SOUND_FOLDER, exist_ok=True)
+    global beep_cache
+    beep_cache = [
+        f for f in os.listdir(SOUND_FOLDER)
+        if f.endswith((".mp3", ".wav", ".ogg"))
+    ]
+    return beep_cache
 
 class BeepPickerView(discord.ui.View):
     """Paginated beep picker. Selecting a file immediately plays it and locks the UI."""
@@ -53,7 +66,7 @@ class BeepPickerView(discord.ui.View):
             # Immediately play and then lock UI
             await interaction.response.defer()  # we'll edit the original message after play
             filename = interaction.data["values"][0]
-            path = os.path.join(BEEP_FOLDER, filename)
+            path = os.path.join(SOUND_FOLDER, filename)
 
             ok = await queue_audio(self.channel, interaction.user, path, 1.0, interaction, play_clip)
 
@@ -123,18 +136,18 @@ class BeepPickerView(discord.ui.View):
             await self.message.edit(content="⏳ Picker timed out. Run `/beepselect` again.", view=self)
 
 async def _beep_autocomplete(interaction: discord.Interaction, current: str):
-    files = [f for f in os.listdir(BEEP_FOLDER) if f.endswith((".mp3", ".wav", ".ogg"))]
     return [
         app_commands.Choice(name=f, value=f)
-        for f in files if current.lower() in f.lower()
+        for f in beep_cache if current.lower() in f.lower()
     ][:25]
 
 class Beep(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
+        load_beeps()
 
     def get_valid_files(self):
-        return [f for f in os.listdir(BEEP_FOLDER) if f.endswith((".mp3", ".wav", ".ogg"))]
+        return beep_cache
 
     @app_commands.command(name="beep", description="Play a random beep sound.")
     async def beep(self, interaction: discord.Interaction):
@@ -151,7 +164,7 @@ class Beep(commands.Cog):
             return
 
         selected = random.choice(files)
-        path = os.path.join(BEEP_FOLDER, selected)
+        path = os.path.join(SOUND_FOLDER, selected)
         # Always go through queue_audio, not play_clip!
         await queue_audio(channel, interaction.user, path, 1.0, interaction, play_clip)
         from .audio_events import signal_activity
@@ -195,12 +208,29 @@ class Beep(commands.Cog):
             # Fallback for classic (prefix) commands: DM the user
             await ctx.author.send(payload)
 
-    @app_commands.command(name="reloadbeeps", description="Reload beep sound files from disk (admin only).")
-    async def reloadbeeps(self, interaction: discord.Interaction):
+    @app_commands.command(
+        name="reloadsounds",
+        description="Reload beep and entrance sound data from disk (admin only).",
+    )
+    async def reloadsounds(self, interaction: discord.Interaction):
         if not interaction.user.guild_permissions.administrator:
-            await interaction.response.send_message("You must be an admin to reload beeps.", ephemeral=True)
+            await interaction.response.send_message(
+                "You must be an admin to reload sounds.", ephemeral=True
+            )
             return
-        await interaction.response.send_message("✅ Beep sounds list reloaded.", ephemeral=True)
+
+        load_beeps()
+        entrance_cog = self.bot.get_cog("Entrance")
+        if entrance_cog and hasattr(entrance_cog, "reload_cache"):
+            entrance_cog.reload_cache()
+
+        audio_cache.cache.clear()
+        preload_audio_clips()
+
+        await interaction.response.send_message(
+            "✅ Beep and entrance sounds reloaded.", ephemeral=True
+        )
 
 async def setup(bot):
     await bot.add_cog(Beep(bot))
+

@@ -9,7 +9,7 @@ from discord import app_commands
 from .audio_events import signal_activity
 from .audio_player import play_clip
 from .audio_queue import queue_audio
-from .constants import ENTRANCE_FOLDER, ENTRANCE_DATA
+from .constants import SOUND_FOLDER, ENTRANCE_DATA
 
 class EntranceView(View):
     def __init__(self, cog, user, files, current_file, current_volume, channel, page=0):
@@ -97,7 +97,7 @@ class EntranceView(View):
     async def preview(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.defer()
         if self.selected_file:
-            path = os.path.join(ENTRANCE_FOLDER, self.selected_file)
+            path = os.path.join(SOUND_FOLDER, self.selected_file)
             success = await queue_audio(self.channel, interaction.user, path, self.volume, interaction, play_clip)
             if not success:
                 return
@@ -184,7 +184,7 @@ class EntranceView(View):
 class Entrance(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.entrance_data = self.load_data()
+        self.reload_cache()
 
     def load_data(self):
         if not os.path.exists(ENTRANCE_DATA):
@@ -197,9 +197,12 @@ class Entrance(commands.Cog):
         with open(ENTRANCE_DATA, "w") as f:
             json.dump(self.entrance_data, f, indent=2)
 
+    def reload_cache(self):
+        self.entrance_data = self.load_data()
+
     def get_valid_files(self):
         return [
-            f for f in os.listdir(ENTRANCE_FOLDER)
+            f for f in os.listdir(SOUND_FOLDER)
             if f.lower().endswith((".mp3", ".wav", ".ogg", ".mp4", ".webm"))
         ]
 
@@ -263,13 +266,7 @@ class Entrance(commands.Cog):
         self.save_data()
         await interaction.response.send_message(f"Set `{filename}` as entrance for {user.mention}.", ephemeral=True)
 
-    @app_commands.command(name="reloadentrances", description="Reload entrance sound files and data from disk (admin only).")
-    async def reloadentrances(self, interaction: discord.Interaction):
-        if not interaction.user.guild_permissions.administrator:
-            await interaction.response.send_message("You must be an admin to reload entrances.", ephemeral=True)
-            return
-        self.entrance_data = self.load_data()
-        await interaction.response.send_message("✅ Entrance sounds and data reloaded.", ephemeral=True)
 
 async def setup(bot):
     await bot.add_cog(Entrance(bot))
+

@@ -6,9 +6,7 @@ import asyncio
 import discord
 from .audio_queue import queue_audio
 from .audio_player import play_clip
-from .constants import ENTRANCE_FOLDER, ENTRANCE_DATA, BEEP_FOLDER
-
-ENTRANCE_DATA = "./data/entrance_sounds.json"
+from .constants import SOUND_FOLDER, ENTRANCE_DATA
 
 # --- Idle timeout settings (defaults) ---
 IDLE_TIMEOUT_DEFAULT = 600  # seconds
@@ -95,7 +93,7 @@ async def on_voice_state_update(member: discord.Member, before, after):
 
             filename = user_data["file"]
             volume = user_data.get("volume", 1.0)
-            path = os.path.join(ENTRANCE_FOLDER, filename)
+            path = os.path.join(SOUND_FOLDER, filename)
             if os.path.exists(path):
                 await queue_audio(vc, member, path, volume, None, play_clip)
         
