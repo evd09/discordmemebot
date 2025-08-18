@@ -5,6 +5,7 @@ from types import SimpleNamespace
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 import reddit_meme
+from helpers import rate_limit
 
 class FakePost(SimpleNamespace):
     pass
@@ -20,7 +21,7 @@ class FakeSubreddit:
 
 
 def collect(limit, total_posts):
-    reddit_meme._last_request = 0
+    rate_limit._last_request = 0
     posts = [FakePost(id=i) for i in range(total_posts)]
     sub = FakeSubreddit(posts)
 
