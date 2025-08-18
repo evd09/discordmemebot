@@ -19,21 +19,158 @@ from .audio.beep import load_beeps
 from .audio.audio_player import preload_audio_clips, audio_cache
 
 
-class MemeAdmin(commands.GroupCog, name="memeadmin", description="Admin commands for MEMER"):
+class AddSubredditModal(discord.ui.Modal, title="Add Subreddit"):
+    def __init__(self, cog: "MemeAdmin"):
+        super().__init__()
+        self.cog = cog
+        self.name = discord.ui.TextInput(label="Subreddit name")
+        self.category = discord.ui.TextInput(label="Category (sfw/nsfw)")
+        self.add_item(self.name)
+        self.add_item(self.category)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        await self.cog.handle_addsubreddit(
+            interaction, self.name.value, self.category.value
+        )
+
+
+class RemoveSubredditModal(discord.ui.Modal, title="Remove Subreddit"):
+    def __init__(self, cog: "MemeAdmin"):
+        super().__init__()
+        self.cog = cog
+        self.name = discord.ui.TextInput(label="Subreddit name")
+        self.category = discord.ui.TextInput(label="Category (sfw/nsfw)")
+        self.add_item(self.name)
+        self.add_item(self.category)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        await self.cog.handle_removesubreddit(
+            interaction, self.name.value, self.category.value
+        )
+
+
+class IdleTimeoutModal(discord.ui.Modal, title="Set Idle Timeout"):
+    def __init__(self, cog: "MemeAdmin"):
+        super().__init__()
+        self.cog = cog
+        self.enabled = discord.ui.TextInput(label="Enabled (true/false)")
+        self.seconds = discord.ui.TextInput(label="Seconds", required=False)
+        self.add_item(self.enabled)
+        self.add_item(self.seconds)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        enabled = self.enabled.value.lower() == "true"
+        secs = int(self.seconds.value) if self.seconds.value else None
+        await self.cog.handle_set_idle_timeout(interaction, enabled, secs)
+
+
+class ToggleGamblingModal(discord.ui.Modal, title="Toggle Gambling"):
+    def __init__(self, cog: "MemeAdmin"):
+        super().__init__()
+        self.cog = cog
+        self.enable = discord.ui.TextInput(label="Enable (true/false)")
+        self.add_item(self.enable)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        enable = self.enable.value.lower() == "true"
+        await self.cog.handle_toggle_gambling(interaction, enable)
+
+
+class SetEntranceModal(discord.ui.Modal, title="Set Entrance"):
+    def __init__(self, cog: "MemeAdmin"):
+        super().__init__()
+        self.cog = cog
+        self.user_id = discord.ui.TextInput(label="User ID")
+        self.filename = discord.ui.TextInput(label="Filename")
+        self.add_item(self.user_id)
+        self.add_item(self.filename)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        try:
+            user = await interaction.client.fetch_user(int(self.user_id.value))
+        except Exception:
+            await interaction.response.send_message(
+                "Invalid user ID.", ephemeral=True
+            )
+            return
+        await self.cog.handle_setentrance(interaction, user, self.filename.value)
+
+
+class AdminView(discord.ui.View):
+    def __init__(self, cog: "MemeAdmin"):
+        super().__init__(timeout=60)
+        self.cog = cog
+
+    @discord.ui.button(label="Ping", style=discord.ButtonStyle.primary)
+    async def ping(self, interaction: discord.Interaction, _: discord.ui.Button):
+        await self.cog.handle_ping(interaction)
+
+    @discord.ui.button(label="Uptime", style=discord.ButtonStyle.primary)
+    async def uptime(self, interaction: discord.Interaction, _: discord.ui.Button):
+        await self.cog.handle_uptime(interaction)
+
+    @discord.ui.button(label="Add Subreddit", style=discord.ButtonStyle.secondary)
+    async def add_subreddit(self, interaction: discord.Interaction, _: discord.ui.Button):
+        await interaction.response.send_modal(AddSubredditModal(self.cog))
+
+    @discord.ui.button(label="Remove Subreddit", style=discord.ButtonStyle.secondary)
+    async def remove_subreddit(self, interaction: discord.Interaction, _: discord.ui.Button):
+        await interaction.response.send_modal(RemoveSubredditModal(self.cog))
+
+    @discord.ui.button(label="Validate Subreddits", style=discord.ButtonStyle.secondary)
+    async def validate_subs(self, interaction: discord.Interaction, _: discord.ui.Button):
+        await self.cog.handle_validatesubreddits(interaction)
+
+    @discord.ui.button(label="Reset Voice Error", style=discord.ButtonStyle.secondary)
+    async def reset_voice_error(self, interaction: discord.Interaction, _: discord.ui.Button):
+        await self.cog.handle_reset_voice_error(interaction)
+
+    @discord.ui.button(label="Set Idle Timeout", style=discord.ButtonStyle.secondary)
+    async def set_idle_timeout(self, interaction: discord.Interaction, _: discord.ui.Button):
+        await interaction.response.send_modal(IdleTimeoutModal(self.cog))
+
+    @discord.ui.button(label="Toggle Gambling", style=discord.ButtonStyle.secondary)
+    async def toggle_gambling(self, interaction: discord.Interaction, _: discord.ui.Button):
+        await interaction.response.send_modal(ToggleGamblingModal(self.cog))
+
+    @discord.ui.button(label="Set Entrance", style=discord.ButtonStyle.secondary)
+    async def set_entrance(self, interaction: discord.Interaction, _: discord.ui.Button):
+        await interaction.response.send_modal(SetEntranceModal(self.cog))
+
+    @discord.ui.button(label="Cache Info", style=discord.ButtonStyle.secondary)
+    async def cache_info(self, interaction: discord.Interaction, _: discord.ui.Button):
+        await self.cog.handle_cacheinfo(interaction)
+
+    @discord.ui.button(label="Reload Sounds", style=discord.ButtonStyle.danger)
+    async def reload_sounds(self, interaction: discord.Interaction, _: discord.ui.Button):
+        await self.cog.handle_reloadsounds(interaction)
+
+
+class MemeAdmin(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.start_time = time.time()
 
-    # ----- Basic Info -----
-    @app_commands.command(name="ping", description="Check bot latency")
-    async def ping(self, interaction: discord.Interaction):
+    @app_commands.command(name="memeadmin", description="Admin commands for MEMER")
+    async def memeadmin(self, interaction: discord.Interaction):
+        if not interaction.user.guild_permissions.administrator:
+            await interaction.response.send_message(
+                "❌ Only admins can use this command.", ephemeral=True
+            )
+            return
+        view = AdminView(self)
+        await interaction.response.send_message(
+            "Select an admin action:", view=view, ephemeral=True
+        )
+
+    # ----- Handlers -----
+    async def handle_ping(self, interaction: discord.Interaction):
         latency_ms = round(self.bot.latency * 1000)
         await interaction.response.send_message(
             f"🏓 Pong! Latency is {latency_ms}ms", ephemeral=True
         )
 
-    @app_commands.command(name="uptime", description="Show bot uptime")
-    async def uptime(self, interaction: discord.Interaction):
+    async def handle_uptime(self, interaction: discord.Interaction):
         elapsed = time.time() - self.start_time
         hours, rem = divmod(int(elapsed), 3600)
         minutes, seconds = divmod(rem, 60)
@@ -41,15 +178,9 @@ class MemeAdmin(commands.GroupCog, name="memeadmin", description="Admin commands
             f"⏱️ Uptime: {hours}h {minutes}m {seconds}s", ephemeral=True
         )
 
-    # ----- Subreddit Management -----
-    @app_commands.command(name="addsubreddit", description="Add a subreddit to SFW or NSFW list.")
-    @app_commands.describe(name="Subreddit name", category="sfw or nsfw")
-    async def addsubreddit(self, interaction: discord.Interaction, name: str, category: str):
-        if not interaction.user.guild_permissions.administrator:
-            await interaction.response.send_message(
-                "❌ Only admins can use this command.", ephemeral=True
-            )
-            return
+    async def handle_addsubreddit(
+        self, interaction: discord.Interaction, name: str, category: str
+    ):
         if category not in ("sfw", "nsfw"):
             await interaction.response.send_message(
                 "Category must be 'sfw' or 'nsfw'.", ephemeral=True
@@ -68,27 +199,16 @@ class MemeAdmin(commands.GroupCog, name="memeadmin", description="Admin commands
             ephemeral=True,
         )
 
-    @app_commands.command(name="removesubreddit", description="Remove a subreddit from SFW/NSFW lists.")
-    @app_commands.describe(name="Subreddit name", category="sfw or nsfw")
-    async def removesubreddit(self, interaction: discord.Interaction, name: str, category: str):
-        if not interaction.user.guild_permissions.administrator:
-            await interaction.response.send_message(
-                "❌ Only admins can use this command.", ephemeral=True
-            )
-            return
+    async def handle_removesubreddit(
+        self, interaction: discord.Interaction, name: str, category: str
+    ):
         remove_guild_subreddit(interaction.guild.id, name, category)
         await interaction.response.send_message(
             f"✅ Removed `{name}` from the {category.upper()} subreddits list for this server.",
             ephemeral=True,
         )
 
-    @app_commands.command(name="validatesubreddits", description="Validate all current subreddits in the DB")
-    async def validatesubreddits(self, interaction: discord.Interaction):
-        if not interaction.user.guild_permissions.administrator:
-            await interaction.response.send_message(
-                "❌ Only admins can use this command.", ephemeral=True
-            )
-            return
+    async def handle_validatesubreddits(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
         meme_cog = self.bot.get_cog("Meme")
         if meme_cog is None:
@@ -113,14 +233,7 @@ class MemeAdmin(commands.GroupCog, name="memeadmin", description="Admin commands
                 lines.append(f"{status} {name}")
         await interaction.followup.send("\n".join(lines), ephemeral=True)
 
-    # ----- Audio Management -----
-    @app_commands.command(name="reset_voice_error", description="Reset all voice error cooldowns for this guild.")
-    async def reset_voice_error(self, interaction: discord.Interaction):
-        if not interaction.user.guild_permissions.administrator:
-            await interaction.response.send_message(
-                "❌ Only admins can use this command.", ephemeral=True
-            )
-            return
+    async def handle_reset_voice_error(self, interaction: discord.Interaction):
         gid = interaction.guild.id
         reset_queue(gid)
         reset_total_failures(gid)
@@ -130,41 +243,22 @@ class MemeAdmin(commands.GroupCog, name="memeadmin", description="Admin commands
             ephemeral=True,
         )
 
-    @app_commands.command(name="set_idle_timeout", description="Set or disable idle timeout for auto-leaving voice.")
-    @app_commands.describe(
-        enabled="Enable idle timeout",
-        seconds="Idle seconds before leaving (ignored if disabled)",
-    )
-    async def set_idle_timeout(
-        self,
-        interaction: discord.Interaction,
-        enabled: bool,
-        seconds: Optional[int] = None,
+    async def handle_set_idle_timeout(
+        self, interaction: discord.Interaction, enabled: bool, seconds: Optional[int] = None
     ):
-        if not interaction.user.guild_permissions.administrator:
-            await interaction.response.send_message(
-                "❌ Only admins can use this command.", ephemeral=True
-            )
-            return
         conf = get_guild_config(interaction.guild.id)
         conf["enabled"] = enabled
         if seconds is not None and enabled:
             conf["seconds"] = max(10, int(seconds))
         await interaction.response.send_message(
-            f"✅ Idle timeout is now {'ENABLED' if enabled else 'DISABLED'}" +
-            (f" ({conf['seconds']}s)" if enabled else ""),
+            f"✅ Idle timeout is now {'ENABLED' if enabled else 'DISABLED'}"
+            + (f" ({conf['seconds']}s)" if enabled else ""),
             ephemeral=True,
         )
 
-    # ----- Gambling Toggle -----
-    @app_commands.command(name="toggle_gambling", description="Enable or disable all /gamble subcommands in this server.")
-    @app_commands.describe(enable="Enable gambling features")
-    async def toggle_gambling(self, interaction: discord.Interaction, enable: bool):
-        if not interaction.user.guild_permissions.administrator:
-            await interaction.response.send_message(
-                "❌ Only admins can use this command.", ephemeral=True
-            )
-            return
+    async def handle_toggle_gambling(
+        self, interaction: discord.Interaction, enable: bool
+    ):
         gamble_cog = self.bot.get_cog("Gamble")
         if gamble_cog is None:
             await interaction.response.send_message(
@@ -178,30 +272,9 @@ class MemeAdmin(commands.GroupCog, name="memeadmin", description="Admin commands
             f"✅ Gambling has been **{status}** on this server.", ephemeral=True
         )
 
-    # ----- Entrance Management -----
-    async def _entrance_file_autocomplete(
-        self, interaction: discord.Interaction, current: str
-    ):
-        entrance_cog = self.bot.get_cog("Entrance")
-        if not entrance_cog:
-            return []
-        files = entrance_cog.get_valid_files()
-        return [
-            app_commands.Choice(name=f, value=f)
-            for f in files if current.lower() in f.lower()
-        ][:25]
-
-    @app_commands.command(name="setentrance", description="Set a user's entrance sound.")
-    @app_commands.describe(user="User to set entrance for", filename="File to set")
-    @app_commands.autocomplete(filename=_entrance_file_autocomplete)
-    async def setentrance(
+    async def handle_setentrance(
         self, interaction: discord.Interaction, user: discord.User, filename: str
     ):
-        if not interaction.user.guild_permissions.administrator:
-            await interaction.response.send_message(
-                "You must be an admin to use this.", ephemeral=True
-            )
-            return
         entrance_cog = self.bot.get_cog("Entrance")
         if entrance_cog is None:
             await interaction.response.send_message(
@@ -220,14 +293,7 @@ class MemeAdmin(commands.GroupCog, name="memeadmin", description="Admin commands
             f"Set `{filename}` as entrance for {user.mention}.", ephemeral=True
         )
 
-    # ----- Cache Info -----
-    @app_commands.command(name="cacheinfo", description="Show cache stats for meme system")
-    async def cacheinfo(self, interaction: discord.Interaction):
-        if not interaction.user.guild_permissions.administrator:
-            await interaction.response.send_message(
-                "❌ Only admins can use this command.", ephemeral=True
-            )
-            return
+    async def handle_cacheinfo(self, interaction: discord.Interaction):
         meme_cog = self.bot.get_cog("Meme")
         if meme_cog is None:
             await interaction.response.send_message(
@@ -239,14 +305,7 @@ class MemeAdmin(commands.GroupCog, name="memeadmin", description="Admin commands
             f"```\n{stats}\n```", ephemeral=True
         )
 
-    # ----- Reload Sounds -----
-    @app_commands.command(name="reloadsounds", description="Reload beep and entrance sound data from disk (admin only).")
-    async def reloadsounds(self, interaction: discord.Interaction):
-        if not interaction.user.guild_permissions.administrator:
-            await interaction.response.send_message(
-                "You must be an admin to reload sounds.", ephemeral=True
-            )
-            return
+    async def handle_reloadsounds(self, interaction: discord.Interaction):
         load_beeps()
         entrance_cog = self.bot.get_cog("Entrance")
         if entrance_cog and hasattr(entrance_cog, "reload_cache"):
