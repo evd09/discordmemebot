@@ -9,8 +9,8 @@ from asyncio import Semaphore
 from collections import deque
 from asyncpraw import Reddit
 from asyncpraw.models import Subreddit, Submission
-from helpers.rate_limit import throttle
-from helpers.reddit_config import CONFIG
+from memer.helpers.rate_limit import throttle
+from memer.helpers.reddit_config import CONFIG
 
 log = logging.getLogger(__name__)
 log.setLevel(logging.INFO)  # or INFO in prod
@@ -210,7 +210,7 @@ async def fetch_meme(
     extract_fn=None,
     filters: Optional[Sequence[Callable[[Submission], bool]]] = None
 ) -> MemeResult:
-    from helpers.meme_utils import extract_post_data
+    from memer.helpers.meme_utils import extract_post_data
     extract_fn = extract_fn or extract_post_data
 
     regex = re.compile(rf'\b{re.escape(keyword.lower())}\b') if keyword else None

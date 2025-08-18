@@ -8,7 +8,7 @@ from collections import OrderedDict
 import discord
 from discord import opus
 
-from logger_setup import setup_logger
+from memer.utils.logger_setup import setup_logger
 from .constants import SOUND_FOLDER
 
 logger = setup_logger("audio", "audio.log")

@@ -10,7 +10,7 @@ from discord import Embed
 from discord import app_commands, Interaction
 from discord.ui import View, button, Button
 from discord.ext import commands, tasks
-from helpers.store import Store
+from memer.helpers.store import Store
 
 log = logging.getLogger(__name__)
 

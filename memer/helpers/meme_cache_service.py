@@ -2,8 +2,8 @@ import asyncio
 from discord.ext import tasks
 from discord import app_commands
 from discord.ext.commands import Context
-from helpers.reddit_cache import RedditCacheManager
-from helpers.meme_utils import extract_post_data
+from .reddit_cache import RedditCacheManager
+from .meme_utils import extract_post_data
 import yaml
 import os
 

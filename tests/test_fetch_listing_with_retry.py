@@ -4,8 +4,8 @@ import asyncio
 from types import SimpleNamespace
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-import reddit_meme
-from helpers import rate_limit
+from memer import reddit_meme
+from memer.helpers import rate_limit
 
 class FakePost(SimpleNamespace):
     pass

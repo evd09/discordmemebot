@@ -1,7 +1,7 @@
 import asyncio
 import time
 
-from helpers.meme_cache_service import MemeCacheService
+from memer.helpers.meme_cache_service import MemeCacheService
 
 
 class DummySubreddit:
