@@ -446,7 +446,11 @@ class Meme(commands.Cog):
         try:
             sub = await self.reddit.subreddit(subreddit, fetch=True)
         except NotFound:
-            return await ctx.reply(f"❌ Could not find subreddit `{subreddit}`.", ephemeral=True)
+            if ctx.interaction:
+                return await ctx.interaction.followup.send(
+                    f"❌ Could not find subreddit `{subreddit}`.", ephemeral=True
+                )
+            return await ctx.send(f"❌ Could not find subreddit `{subreddit}`.")
 
         # 3) Fetch via pipeline (or random fallback)
         post = None
