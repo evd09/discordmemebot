@@ -408,16 +408,50 @@ class MemeAdmin(commands.Cog):
 
     @app_commands.command(name="memeadmin", description="Admin commands for MEMER")
     async def memeadmin(self, interaction: discord.Interaction):
+        try:
+            await interaction.response.defer(ephemeral=True)
+            use_followup = True
+        except discord.errors.NotFound:
+            log.warning("memeadmin defer failed; interaction not found")
+            use_followup = False
+
         if not interaction.user.guild_permissions.administrator:
-            await interaction.response.send_message(
-                "❌ Only admins can use this command.", ephemeral=True
-            )
+            if use_followup:
+                try:
+                    await interaction.followup.send(
+                        "❌ Only admins can use this command.", ephemeral=True
+                    )
+                except discord.errors.NotFound:
+                    log.warning(
+                        "memeadmin followup send failed; interaction not found"
+                    )
+                    await interaction.channel.send(
+                        "❌ Only admins can use this command."
+                    )
+            else:
+                await interaction.channel.send(
+                    "❌ Only admins can use this command."
+                )
             return
+
         view = AdminView(self)
-        await interaction.response.send_message(
-            "Select an admin action:", view=view, ephemeral=True
-        )
-        view.message = await interaction.original_response()
+        if use_followup:
+            try:
+                msg = await interaction.followup.send(
+                    "Select an admin action:", view=view, ephemeral=True
+                )
+            except discord.errors.NotFound:
+                log.warning(
+                    "memeadmin followup send failed; interaction not found"
+                )
+                msg = await interaction.channel.send(
+                    "Select an admin action:", view=view
+                )
+        else:
+            msg = await interaction.channel.send(
+                "Select an admin action:", view=view
+            )
+        view.message = msg
 
     # ----- Handlers -----
     async def handle_ping(self, interaction: discord.Interaction):
