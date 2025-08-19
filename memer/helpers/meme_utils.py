@@ -1,5 +1,4 @@
 import logging
-from urllib.parse import urlparse
 from asyncpraw.models import Submission
 from html import unescape
 from discord import Embed
@@ -18,14 +17,23 @@ async def send_meme(
     content: Optional[str] = None,
     embed: Optional[Embed] = None,
 ):
-    """
-    If embed is provided, set its image to `url` and send (embed + optional content).
-    Otherwise just send the raw link (with optional content above it).
-    """
-    if embed:
-        embed.set_image(url=url)
+    """Send a meme to Discord.
 
-    text = f"{content}\n{url}" if content else url
+    Images are sent as an embed with the image attached. For other URLs
+    (e.g., videos), the URL is included in the message content so Discord
+    can generate its own preview.
+    """
+    is_image = url.lower().endswith(IMAGE_EXT)
+
+    # If this is an image, attach it to the embed; otherwise, fall back to
+    # sending the URL directly so Discord can unfurl videos/gifs.
+    if embed and is_image:
+        embed.set_image(url=url)
+        text = content
+    else:
+        text = f"{content}\n{url}" if content else url
+        if not is_image:
+            embed = None
 
     if getattr(ctx, "interaction", None) and not ctx.interaction.response.is_done():
         try:
@@ -35,17 +43,11 @@ async def send_meme(
 
     try:
         if getattr(ctx, "interaction", None):
-            if embed:
-                return await ctx.interaction.followup.send(content=content, embed=embed)
-            log.debug("🔥 send_meme (plain link) → %s", text)
-            return await ctx.interaction.followup.send(content=text)
+            return await ctx.interaction.followup.send(content=text, embed=embed)
     except discord.errors.NotFound:
         pass
 
-    if embed:
-        return await ctx.send(content=content, embed=embed)
-    log.debug("🔥 send_meme fallback (plain link) → %s", text)
-    return await ctx.send(text)
+    return await ctx.send(content=text, embed=embed)
 
 def get_image_url(post: Submission) -> str:
     url = post.url
@@ -81,20 +83,13 @@ def get_image_url(post: Submission) -> str:
         return url
 
 def get_rxddit_url(url: str) -> str:
+    """Return a URL suitable for Discord embeds.
+
+    Previously this function proxied Reddit media through `rxddit.com`,
+    which prevented Discord from displaying the images or videos. The
+    proxying is removed so the original Reddit URL is used directly.
+    """
     log.debug("get_rxddit_url input=%s", url)
-    parsed = urlparse(url)
-    host, path = parsed.netloc.lower(), parsed.path.lstrip("/")
-
-    if host in ("i.redd.it", "external-preview.redd.it"):
-        proxied = f"https://i.rxddit.com/{path}"
-        log.debug("Proxied image URL=%s", proxied)
-        return proxied
-
-    if host == "v.redd.it":
-        proxied = f"https://v.rxddit.com/{path}"
-        log.debug("Proxied video URL=%s", proxied)
-        return proxied
-
     return url
 
 def extract_post_data(post):
