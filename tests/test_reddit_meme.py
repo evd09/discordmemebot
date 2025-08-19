@@ -49,7 +49,7 @@ class FakeSubreddit:
         for p in self.posts:
             yield p
 
-    async def best(self, limit):
+    async def top(self, limit):
         for p in self.posts:
             yield p
 
@@ -114,9 +114,9 @@ def test_keyword_filter_rejects_non_matching_posts():
     assert result.errors == ["no valid posts"]
 
 
-def test_fetch_meme_supports_best_listing():
+def test_fetch_meme_supports_top_listing():
     random.seed(0)
-    posts = [FakePost("Best meme")] 
+    posts = [FakePost("Top meme")]
     reddit = FakeReddit(posts)
     cache = DummyCache()
 
@@ -125,7 +125,7 @@ def test_fetch_meme_supports_best_listing():
             reddit,
             ["testsub"],
             cache,
-            listings=("best",),
+            listings=("top",),
             limit=10,
             extract_fn=lambda p: {
                 "title": p.title,

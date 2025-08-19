@@ -205,7 +205,7 @@ async def fetch_meme(
     subreddits: Sequence[Union[str, Subreddit]],
     cache_mgr,
     keyword: Optional[str] = None,
-    listings: Sequence[str] = ("hot", "new", "top", "best"),
+    listings: Sequence[str] = ("hot", "new", "top"),
     limit: int = 75,
     extract_fn=None,
     filters: Optional[Sequence[Callable[[Submission], bool]]] = None,
