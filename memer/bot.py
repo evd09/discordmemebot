@@ -160,6 +160,21 @@ async def sync_app_commands(bot: commands.Bot) -> None:
     except Exception:
         log.error("❌ Failed to sync slash commands", exc_info=True)
 
+    # Fetch global commands after syncing to ensure deprecated commands were removed
+    try:
+        global_cmds = await bot.tree.fetch_commands()
+        global_names = {cmd.name for cmd in global_cmds}
+        expected_names = {cmd.name for cmd in cmds}
+        log.info("🌐 Commands currently registered globally: %s", sorted(global_names))
+        leftover = global_names - expected_names
+        if leftover:
+            log.warning(
+                "Unwanted global commands remain after sync; manual removal may be required: %s",
+                sorted(leftover),
+            )
+    except Exception:
+        log.error("Failed to fetch global commands after sync", exc_info=True)
+
     if DEV_GUILD_ID:
         guild = bot.get_guild(DEV_GUILD_ID)
         if guild is None:
