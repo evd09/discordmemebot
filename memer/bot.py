@@ -18,7 +18,7 @@ DEV_GUILD_ID = int(os.getenv("DEV_GUILD_ID", "0"))  # Sync commands per Guild ID
 import asyncio
 import pathlib
 import discord
-from discord.errors import Forbidden 
+from discord.errors import Forbidden, LoginFailure
 from discord import Object
 import logging
 import importlib
@@ -231,7 +231,12 @@ async def main() -> None:
         await load_extensions()
         events = importlib.import_module("memer.cogs.audio.audio_events")
         await events.setup(bot)
-        await bot.start(TOKEN)
+        try:
+            await bot.start(TOKEN)
+        except (LoginFailure, TypeError):
+            log.error(
+                "Invalid or missing DISCORD_TOKEN. Set a valid token before starting the bot."
+            )
     # Persist guild subreddit cache after the bot has shut down
     await db.close()
     await meme_stats.close()
