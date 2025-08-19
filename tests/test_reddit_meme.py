@@ -69,7 +69,7 @@ class FakeReddit:
 
 def test_keyword_filter_accepts_only_matching_posts():
     random.seed(0)
-    posts = [FakePost("The Cat returns"), FakePost("concatenate words")]
+    posts = [FakePost("The Cat returns"), FakePost("dog days")]
     reddit = FakeReddit(posts)
     cache = DummyCache()
 
@@ -95,7 +95,7 @@ def test_keyword_filter_accepts_only_matching_posts():
 
 def test_keyword_filter_rejects_non_matching_posts():
     random.seed(0)
-    posts = [FakePost("concatenate"), FakePost("dog days")]
+    posts = [FakePost("horse play"), FakePost("dog days")]
     reddit = FakeReddit(posts)
     cache = DummyCache()
 

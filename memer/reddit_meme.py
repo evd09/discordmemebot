@@ -1,7 +1,6 @@
 import random
 import asyncio
 import logging
-import re
 from typing import Optional, Callable, Sequence, List, Union, Dict, AsyncIterator, Tuple
 from dataclasses import dataclass
 from cachetools import TTLCache
@@ -272,7 +271,7 @@ async def fetch_meme(
     from memer.helpers.meme_utils import extract_post_data
     extract_fn = extract_fn or extract_post_data
 
-    regex = re.compile(rf'\b{re.escape(keyword.lower())}\b') if keyword else None
+    regex = keyword is not None
     exclude_ids_set = set(exclude_ids or [])
     subreddit_names = {
         getattr(s, "display_name", str(s)).lower()
@@ -313,7 +312,7 @@ async def fetch_meme(
                 return False
             if url and url in random_cache_urls:
                 return False
-        if regex and not regex.search((p.title or "").lower()):
+        if regex and keyword.lower() not in (p.title or "").lower():
             return False
         if filters and not all(f(p) for f in filters):
             return False
