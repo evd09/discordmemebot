@@ -142,6 +142,8 @@ DAILY_BONUS=50
 # Optional: audio cache limit
 MAX_CACHE_SIZE=100
 ```
+**Note:** Save the `.env` file with UTF-8 encoding to retain emojis. Latin-1 or other encodings will replace emojis with `??`.
+
 **Tip: Make sure you don’t have spaces around the = and remove any # comments from actual lines.**
 ### 3. Run with Docker CLI ###
 ```
