@@ -3,6 +3,7 @@ import time
 from typing import Optional
 from pathlib import Path
 import subprocess
+import logging
 
 import discord
 from discord.ext import commands
@@ -21,6 +22,7 @@ from .audio.beep import load_beeps
 from .audio.audio_player import preload_audio_clips, audio_cache
 from .audio.constants import SOUND_FOLDER
 
+log = logging.getLogger(__name__)
 
 class AddSubredditModal(discord.ui.Modal, title="Add Subreddit"):
     def __init__(self, cog: "MemeAdmin"):
@@ -327,6 +329,7 @@ class AdminView(discord.ui.View):
     def __init__(self, cog: "MemeAdmin"):
         super().__init__(timeout=60)
         self.cog = cog
+        self.message: discord.Message | None = None
 
     @discord.ui.button(label="Ping", style=discord.ButtonStyle.primary)
     async def ping(self, interaction: discord.Interaction, _: discord.ui.Button):
@@ -390,6 +393,15 @@ class AdminView(discord.ui.View):
     async def reload_sounds(self, interaction: discord.Interaction, _: discord.ui.Button):
         await self.cog.handle_reloadsounds(interaction)
 
+    async def on_timeout(self):
+        for child in self.children:
+            child.disabled = True
+        try:
+            if self.message:
+                await self.message.edit(view=self)
+        except Exception:
+            log.exception("Failed to disable buttons on timeout in AdminView")
+
 
 class MemeAdmin(commands.Cog):
     def __init__(self, bot: commands.Bot):
@@ -407,6 +419,7 @@ class MemeAdmin(commands.Cog):
         await interaction.response.send_message(
             "Select an admin action:", view=view, ephemeral=True
         )
+        view.message = await interaction.original_response()
 
     # ----- Handlers -----
     async def handle_ping(self, interaction: discord.Interaction):
