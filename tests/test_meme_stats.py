@@ -49,3 +49,24 @@ def test_init_creates_parent_directory(tmp_path):
     assert db_path.exists()
 
     asyncio.run(meme_stats.close())
+
+
+def test_update_stats_handles_subreddit_objects(tmp_path):
+    db_path = tmp_path / "stats.db"
+    os.environ["MEME_STATS_DB"] = str(db_path)
+
+    if "memer.meme_stats" in sys.modules:
+        del sys.modules["memer.meme_stats"]
+    meme_stats = importlib.import_module("memer.meme_stats")
+
+    asyncio.run(meme_stats.init())
+
+    class DummySubreddit:
+        display_name = "dummysub"
+
+    asyncio.run(meme_stats.update_stats(1, "python", DummySubreddit(), False))
+
+    top_subreddits = asyncio.run(meme_stats.get_top_subreddits())
+    assert top_subreddits[0] == ("dummysub", 1)
+
+    asyncio.run(meme_stats.close())

@@ -125,12 +125,23 @@ async def get_all_stats() -> Dict[str, int]:
 
 # --- Update stats (main entry point for bot) -----------------------------
 
-async def update_stats(user_id: int, keyword: str, subreddit: str, nsfw: bool = False) -> None:
+async def update_stats(user_id: int, keyword: str, subreddit: Any, nsfw: bool = False) -> None:
+    """Record usage statistics for a meme command.
+
+    ``subreddit`` may be provided as either a string or a PRAW ``Subreddit``
+    object.  We normalise it to the subreddit display name so the database
+    always stores plain strings, avoiding ``sqlite3.ProgrammingError`` when a
+    non-string object is passed in.
+    """
+
     await inc_stat("total_memes", 1)
     if nsfw:
         await inc_stat("nsfw_memes", 1)
 
     keyword = (keyword or "").lower()
+    subreddit = getattr(subreddit, "display_name", subreddit)
+    subreddit = str(subreddit or "")
+
     conn = _require_conn()
     await conn.execute(
         "INSERT INTO keyword_counts (keyword, count) VALUES (?, 1) "
