@@ -566,6 +566,19 @@ class GameSelectView(View):
     def __init__(self, cog: "Gamble", amount: Optional[int], auto_aces: bool):
         super().__init__(timeout=30)
         self.add_item(GameSelect(cog, amount, auto_aces))
+        self.message: discord.Message | None = None
+
+    async def on_timeout(self):
+        for child in self.children:
+            child.disabled = True
+        try:
+            if self.message:
+                await self.message.edit(view=self)
+        except Exception:
+            log.exception(
+                "Failed to disable select on timeout in %s",
+                self.__class__.__name__,
+            )
 
 class Gamble(commands.Cog):
     """Slash‐only gambling commands"""
@@ -598,6 +611,7 @@ class Gamble(commands.Cog):
         await interaction.response.send_message(
             "🎰 Choose a game to play:", view=view, ephemeral=True
         )
+        view.message = await interaction.original_response()
 
     # shorthand for losing/winning bets
     async def _charge(self, uid: str, amt: int, reason: str):
