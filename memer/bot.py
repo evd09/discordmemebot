@@ -12,6 +12,7 @@ from discord.errors import Forbidden
 from discord import Object
 import logging
 import importlib
+import importlib.util
 
 from memer.web.stats_server import start_stats_server
 from discord.ext import commands
@@ -119,6 +120,40 @@ async def cleanup_all_voice(bot):
         except Exception as e:
             print(f"[STARTUP CLEANUP ERROR] {guild.name}: {e}")
 
+
+async def prune_stale_commands() -> None:
+    """Remove application commands whose source cog files are missing."""
+    log.info("🧹 Checking for commands with missing source files…")
+
+    valid_names = set()
+    for cmd in bot.tree.get_commands():
+        module = cmd.callback.__module__
+        spec = importlib.util.find_spec(module)
+        if spec and spec.origin and os.path.exists(spec.origin):
+            valid_names.add(cmd.name)
+        else:
+            bot.tree.remove_command(cmd.name)
+            log.warning("Removed command '%s'; missing module '%s'", cmd.name, module)
+
+    # Remove lingering remote commands
+    existing = await bot.tree.fetch_commands()
+    for cmd in existing:
+        if cmd.name not in valid_names:
+            await bot.http.delete_global_command(cmd.id)
+            log.info("🗑️ Removed stale global command '%s'", cmd.name)
+
+    if DEV_GUILD_ID:
+        guild_obj = Object(id=DEV_GUILD_ID)
+        existing = await bot.tree.fetch_commands(guild=guild_obj)
+        for cmd in existing:
+            if cmd.name not in valid_names:
+                await bot.http.delete_guild_command(DEV_GUILD_ID, cmd.id)
+                log.info(
+                    "🗑️ Removed stale command '%s' from dev guild %s",
+                    cmd.name,
+                    DEV_GUILD_ID,
+                )
+
 @bot.event
 async def on_ready() -> None:
     await cleanup_all_voice(bot)
@@ -126,6 +161,8 @@ async def on_ready() -> None:
     log.info(f"🚀 Logged in as {bot.user} (ID: {bot.user.id})")
     log.info("Bot is in guilds: %s", [g.id for g in bot.guilds])
     log.info("DEV_GUILD_ID = %s", DEV_GUILD_ID)
+
+    await prune_stale_commands()
 
     # Diagnostic
     cmds = bot.tree.get_commands()
