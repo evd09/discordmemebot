@@ -19,6 +19,8 @@ class EntranceView(View):
         self.files = files
         self.selected_file = current_file or (files[0] if files else None)
         self.volume = current_volume
+        self.saved_file = current_file
+        self.saved_volume = current_volume
         self.channel = channel
         self.message: discord.Message = None
         self._voice_monitor_task = None
@@ -32,6 +34,13 @@ class EntranceView(View):
 
         # Add pagination buttons on row 3 if needed
         self.add_pagination()
+
+    def format_message(self, prefix: str) -> str:
+        status = (
+            f"Current entrance: `{self.saved_file}` — Volume: {int(self.saved_volume*100)}%"
+            if self.saved_file else "Current entrance: none set."
+        )
+        return f"{prefix}\n{status}"
 
     def add_selects(self):
         # Always remove selects if already present
@@ -77,20 +86,28 @@ class EntranceView(View):
         self.add_selects()
         self.add_pagination()
         await interaction.response.edit_message(
-            content=f"🎛️ Manage your entrance (Page {self.page+1}/{self.max_page+1}):",
+            content=self.format_message(
+                f"🎛️ Manage your entrance (Page {self.page+1}/{self.max_page+1}):"
+            ),
             view=self
         )
 
     async def on_file_select(self, interaction: discord.Interaction):
         self.selected_file = interaction.data["values"][0]
         await interaction.response.edit_message(
-            content=f"✅ Selected `{self.selected_file}` — Volume: {int(self.volume*100)}%", view=self
+            content=self.format_message(
+                f"✅ Selected `{self.selected_file}` — Volume: {int(self.volume*100)}%"
+            ),
+            view=self
         )
 
     async def on_volume_select(self, interaction: discord.Interaction):
         self.volume = float(interaction.data["values"][0])
         await interaction.response.edit_message(
-            content=f"✅ Volume set to {int(self.volume*100)}% — File: `{self.selected_file}`", view=self
+            content=self.format_message(
+                f"✅ Volume set to {int(self.volume*100)}% — File: `{self.selected_file}`"
+            ),
+            view=self
         )
 
     @discord.ui.button(label="🔊 Preview", style=discord.ButtonStyle.primary, custom_id="preview", row=2)
@@ -102,13 +119,18 @@ class EntranceView(View):
             if not success:
                 return
             signal_activity(interaction.guild.id)
-            msg = f"🎧 Previewing `{self.selected_file}` at {int(self.volume*100)}%\n(You can keep changing file/volume and preview as much as you want before saving!)"
+            msg = self.format_message(
+                f"🎧 Previewing `{self.selected_file}` at {int(self.volume*100)}%\n(You can keep changing file/volume and preview as much as you want before saving!)"
+            )
             if self.message:
                 await self.message.edit(content=msg, view=self)
             else:
                 await interaction.edit_original_response(content=msg, view=self)
         else:
-            await interaction.edit_original_response(content="❌ No entrance file selected.", view=self)
+            await interaction.edit_original_response(
+                content=self.format_message("❌ No entrance file selected."),
+                view=self
+            )
 
     @discord.ui.button(label="💾 Save", style=discord.ButtonStyle.success, custom_id="save", row=2)
     async def save(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -119,12 +141,15 @@ class EntranceView(View):
             "volume": self.volume
         }
         self.cog.save_data()
+        self.saved_file = self.selected_file
+        self.saved_volume = self.volume
         for child in self.children:
             child.disabled = True
+        msg = self.format_message("✅ Entrance saved!")
         if self.message:
-            await self.message.edit(content="✅ Entrance saved!", view=self)
+            await self.message.edit(content=msg, view=self)
         else:
-            await interaction.edit_original_response(content="✅ Entrance saved!", view=self)
+            await interaction.edit_original_response(content=msg, view=self)
         self.stop()
     
     @discord.ui.button(label="❌ Remove", style=discord.ButtonStyle.danger, custom_id="remove", row=2)
@@ -134,9 +159,11 @@ class EntranceView(View):
         if uid in self.cog.entrance_data:
             del self.cog.entrance_data[uid]
             self.cog.save_data()
-            msg = "🗑️ Entrance removed! Pick a new sound or Save."
+            self.saved_file = None
+            self.saved_volume = 1.0
+            msg = self.format_message("🗑️ Entrance removed! Pick a new sound or Save.")
         else:
-            msg = "You have no entrance set. Pick a sound and Save one!"
+            msg = self.format_message("You have no entrance set. Pick a sound and Save one!")
         if self.message:
             await self.message.edit(content=msg, view=self)
         else:
@@ -227,22 +254,21 @@ class Entrance(commands.Cog):
             return
 
         signal_activity(interaction.guild.id)
-        view = EntranceView(self, interaction.user, files, user_data.get("file"), user_data.get("volume", 1.0), channel, page=0)
+        view = EntranceView(
+            self,
+            interaction.user,
+            files,
+            user_data.get("file"),
+            user_data.get("volume", 1.0),
+            channel,
+            page=0,
+        )
         await interaction.response.send_message(
-            "🎛️ Manage your entrance:", view=view, ephemeral=True
+            view.format_message("🎛️ Manage your entrance:"),
+            view=view,
+            ephemeral=True,
         )
         view.message = await interaction.original_response()
-
-    @app_commands.command(name="myentrance", description="Show your current entrance sound.")
-    async def myentrance(self, interaction: discord.Interaction):
-        uid = str(interaction.user.id)
-        data = self.entrance_data.get(uid)
-        if not data:
-            await interaction.response.send_message("You don't have an entrance set. Use `/entrance` to pick one!", ephemeral=True)
-            return
-        await interaction.response.send_message(
-            f"Your entrance: `{data['file']}` — Volume: {int(data.get('volume', 1.0)*100)}%", ephemeral=True
-        )
 
 
 async def setup(bot):

@@ -255,8 +255,7 @@ Subreddit management is handled through `/memeadmin` buttons or automatic refres
 ### Entrance/Beeps
 | Command | Description |
 | --- | --- |
-| /entrance | **Interactive UI**: Set, preview, remove |
-| /myentrance | Show your entrance file/volume |
+| /entrance | **Interactive UI**: Set, preview, remove; shows current entrance |
 | /beeps | Play a random beep or choose one |
 
 

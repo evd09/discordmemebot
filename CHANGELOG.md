@@ -1,5 +1,10 @@
 # Changelog
 
+# Version 5.1 #
+
+- `/entrance` UI now displays your current entrance and updates when changed.
+- Removed standalone `/myentrance` command; resync global commands after updating.
+
 # Version 5.0 #
 
 - Removed standalone `/ping` and `/uptime` commands; their functionality now lives in the `/memeadmin` interface.
