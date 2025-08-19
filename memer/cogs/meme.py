@@ -159,6 +159,7 @@ class Meme(commands.Cog):
             subreddits=get_guild_subreddits(ctx.guild.id, "sfw"),
             cache_mgr=self.cache_service.cache_mgr,
             keyword=keyword,
+            nsfw=False,
         )
         post = getattr(result, "post", None)
 
@@ -246,6 +247,7 @@ class Meme(commands.Cog):
             subreddits=get_guild_subreddits(ctx.guild.id, "nsfw"),
             cache_mgr=self.cache_service.cache_mgr,
             keyword=keyword,
+            nsfw=True,
         )
         post = getattr(result, "post", None)
 
@@ -329,6 +331,7 @@ class Meme(commands.Cog):
                 subreddits=[sub],
                 keyword=keyword,
                 cache_mgr=self.cache_service.cache_mgr,
+                nsfw=bool(getattr(sub, "over18", False)),
             )
             post = getattr(result, "post", None) if result else None
 

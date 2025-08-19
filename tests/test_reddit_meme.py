@@ -13,22 +13,22 @@ class DummyCache:
         self.cached = None
         self.failed = False
 
-    def get_from_ram(self, keyword):
+    def get_from_ram(self, keyword, nsfw=False):
         return None
 
-    async def get_from_disk(self, keyword):
+    async def get_from_disk(self, keyword, nsfw=False):
         return None
 
-    def is_disabled(self, keyword):
+    def is_disabled(self, keyword, nsfw=False):
         return False
 
-    def cache_to_ram(self, keyword, posts):
+    def cache_to_ram(self, keyword, posts, nsfw=False):
         self.cached = posts
 
-    async def save_to_disk(self, keyword, posts):
+    async def save_to_disk(self, keyword, posts, nsfw=False):
         pass
 
-    def record_failure(self, keyword):
+    def record_failure(self, keyword, nsfw=False):
         self.failed = True
 
 
