@@ -14,8 +14,10 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 import aiosqlite
 
-# Path to the SQLite database.  Can be overridden via environment variable.
-DB_PATH = os.getenv("MEME_STATS_DB", "meme_stats.db")
+# Path to the SQLite database.  By default we store it under the writable
+# ``data`` directory.  This can be overridden via the ``MEME_STATS_DB``
+# environment variable.
+DB_PATH = os.getenv("MEME_STATS_DB", os.path.join("data", "meme_stats.db"))
 
 # Module level connection reused by all helpers
 _conn: Optional[aiosqlite.Connection] = None
