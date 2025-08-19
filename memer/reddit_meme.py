@@ -2,7 +2,7 @@ import random
 import asyncio
 import logging
 import re
-from typing import Optional, Callable, Sequence, List, Union, Dict, AsyncIterator
+from typing import Optional, Callable, Sequence, List, Union, Dict, AsyncIterator, Tuple
 from dataclasses import dataclass
 from cachetools import TTLCache
 from asyncio import Semaphore
@@ -40,6 +40,7 @@ class MemeResult:
     tried_subreddits: List[str]
     errors: List[str]
     picked_via: str  # e.g., 'hot', 'new', 'top', 'random', 'none'
+    post_dict: Optional[dict] = None
 
 # --- Internal Helpers ---
 async def _fetch_listing_with_retry(
@@ -241,13 +242,21 @@ async def fetch_meme(
             ]
             if valid:
                 chosen = random.choice(valid)
+                class Cached:
+                    title = chosen["title"]
+                    permalink = f"/r/{chosen['subreddit']}/comments/{chosen['post_id']}/"
+                    url = chosen["media_url"]
+                    id = chosen["post_id"]
+                    author = chosen.get("author") or "[deleted]"
+
                 return MemeResult(
-                    None,
+                    Cached,
                     chosen.get("subreddit"),
                     "cache_ram",
                     [keyword],
                     [],
                     "cache",
+                    chosen,
                 )
 
         # (2) Disk cache
@@ -274,6 +283,7 @@ async def fetch_meme(
                     [keyword],
                     [],
                     "cache",
+                    chosen,
                 )
 
         # (3) Disabled?
@@ -281,7 +291,7 @@ async def fetch_meme(
             return MemeResult(None, None, None, [keyword], ["disabled"], "fallback")
 
         # (4) Live Reddit fetch across all provided subreddits
-        posts: List[Dict] = []
+        posts: List[Tuple[Submission, dict]] = []
         listing_used: Optional[str] = None
         try:
             # create subreddit objects (concurrently) then iterate through listings
@@ -295,7 +305,7 @@ async def fetch_meme(
                     for post in post_list:
                         if is_valid_post(post):
                             data = extract_fn(post)
-                            posts.append(data)
+                            posts.append((post, data))
                 if posts:
                     listing_used = listing_choice
                     break
@@ -303,16 +313,18 @@ async def fetch_meme(
             posts = []
 
         if posts:
-            cache_mgr.cache_to_ram(keyword, posts, nsfw=nsfw)
-            await cache_mgr.save_to_disk(keyword, posts, nsfw=nsfw)
-            chosen = random.choice(posts)
+            cache_posts = [d for _, d in posts]
+            cache_mgr.cache_to_ram(keyword, cache_posts, nsfw=nsfw)
+            await cache_mgr.save_to_disk(keyword, cache_posts, nsfw=nsfw)
+            chosen_post, chosen_data = random.choice(posts)
             return MemeResult(
-                None,
-                chosen.get("subreddit"),
+                chosen_post,
+                chosen_data.get("subreddit"),
                 listing_used,
                 [keyword],
                 [],
                 "live",
+                chosen_data,
             )
         else:
             cache_mgr.record_failure(keyword, nsfw=nsfw)
@@ -343,7 +355,7 @@ async def fetch_meme(
                         choice_post = post
             if choice_post:
                 data = extract_fn(choice_post)
-                return MemeResult(None, name, listing_choice, tried, [], "fallback")
+                return MemeResult(choice_post, name, listing_choice, tried, [], "fallback", data)
         except Exception:
             continue
 
@@ -353,7 +365,7 @@ async def fetch_meme(
     post = await simple_random_meme(reddit, chosen_sub)
     if post and is_valid_post(post):
         data = extract_fn(post)
-        return MemeResult(None, chosen_sub, "random", tried, [], "random")
+        return MemeResult(post, chosen_sub, "random", tried, [], "random", data)
 
     # ─── total failure ────────────────────────────────────
     return MemeResult(None, None, None, tried, ["All fallback failed"], "none")
