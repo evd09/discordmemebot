@@ -208,7 +208,8 @@ async def fetch_meme(
     listings: Sequence[str] = ("hot", "new"),
     limit: int = 75,
     extract_fn=None,
-    filters: Optional[Sequence[Callable[[Submission], bool]]] = None
+    filters: Optional[Sequence[Callable[[Submission], bool]]] = None,
+    nsfw: bool = False,
 ) -> MemeResult:
     from memer.helpers.meme_utils import extract_post_data
     extract_fn = extract_fn or extract_post_data
@@ -227,7 +228,7 @@ async def fetch_meme(
     # ─── keyword path ─────────────────────────────────────
     if keyword:
         # (1) RAM cache
-        posts = cache_mgr.get_from_ram(keyword)
+        posts = cache_mgr.get_from_ram(keyword, nsfw=nsfw)
         if posts:
             valid = [p for p in posts if p.get("media_url")]
             if valid:
@@ -235,7 +236,7 @@ async def fetch_meme(
                 return MemeResult(None, chosen.get("subreddit"), "cache_ram", [keyword], [], "cache")
 
         # (2) Disk cache
-        posts = await cache_mgr.get_from_disk(keyword)
+        posts = await cache_mgr.get_from_disk(keyword, nsfw=nsfw)
         if posts:
             chosen = random.choice([p for p in posts if p.get("media_url")])
             class Cached:
@@ -246,7 +247,7 @@ async def fetch_meme(
             return MemeResult(Cached, chosen["subreddit"], "cache_disk", [keyword], [], "cache")
 
         # (3) Disabled?
-        if cache_mgr.is_disabled(keyword):
+        if cache_mgr.is_disabled(keyword, nsfw=nsfw):
             return MemeResult(None, None, None, [keyword], ["disabled"], "fallback")
 
         # (4) Live Reddit fetch from a single randomly-chosen subreddit
@@ -269,8 +270,8 @@ async def fetch_meme(
             posts = []
 
         if posts:
-            cache_mgr.cache_to_ram(keyword, posts)
-            await cache_mgr.save_to_disk(keyword, posts)
+            cache_mgr.cache_to_ram(keyword, posts, nsfw=nsfw)
+            await cache_mgr.save_to_disk(keyword, posts, nsfw=nsfw)
             chosen = chosen or random.choice(posts)
             return MemeResult(
                 None,
@@ -281,7 +282,7 @@ async def fetch_meme(
                 "live",
             )
         else:
-            cache_mgr.record_failure(keyword)
+            cache_mgr.record_failure(keyword, nsfw=nsfw)
             return MemeResult(
                 None,
                 None,

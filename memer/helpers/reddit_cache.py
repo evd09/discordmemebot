@@ -1,7 +1,7 @@
 import os
 import asyncio
 import time
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 from collections import defaultdict
 
 import aiosqlite
@@ -19,9 +19,9 @@ class RedditCacheManager:
         self.keyword_failures = keyword_failures
         self.keyword_ttl = keyword_ttl
 
-        self.ram_cache: Dict[str, Dict] = {}  # { keyword: {"posts": [...], "timestamp": float} }
-        self.disabled_keywords: Dict[str, float] = {}  # { keyword: timestamp_disabled }
-        self.failed_count: Dict[str, int] = defaultdict(int)
+        self.ram_cache: Dict[Tuple[str, bool], Dict] = {}
+        self.disabled_keywords: Dict[Tuple[str, bool], float] = {}
+        self.failed_count: Dict[Tuple[str, bool], int] = defaultdict(int)
         self.lock = asyncio.Lock()
         self.conn: Optional[aiosqlite.Connection] = None
 
@@ -56,24 +56,25 @@ class RedditCacheManager:
         await self.conn.execute("CREATE INDEX IF NOT EXISTS idx_cached_at ON meme_cache(cached_at)")
         await self.conn.commit()
 
-    def is_disabled(self, keyword: str) -> bool:
-        ts = self.disabled_keywords.get(keyword)
+    def is_disabled(self, keyword: str, nsfw: bool = False) -> bool:
+        key = (keyword, nsfw)
+        ts = self.disabled_keywords.get(key)
         if ts and (time.time() - ts < self.keyword_ttl):
             return True
-        self.disabled_keywords.pop(keyword, None)
+        self.disabled_keywords.pop(key, None)
         return False
 
-    def disable_keyword(self, keyword: str):
-        self.disabled_keywords[keyword] = time.time()
+    def disable_keyword(self, keyword: str, nsfw: bool = False):
+        self.disabled_keywords[(keyword, nsfw)] = time.time()
 
-    def cache_to_ram(self, keyword: str, posts: List[dict]):
-        self.ram_cache[keyword] = {
+    def cache_to_ram(self, keyword: str, posts: List[dict], nsfw: bool = False):
+        self.ram_cache[(keyword, nsfw)] = {
             "posts": posts,
             "timestamp": time.time()
         }
 
-    def get_from_ram(self, keyword: str) -> Optional[List[dict]]:
-        entry = self.ram_cache.get(keyword)
+    def get_from_ram(self, keyword: str, nsfw: bool = False) -> Optional[List[dict]]:
+        entry = self.ram_cache.get((keyword, nsfw))
         if entry:
             age = time.time() - entry["timestamp"]
             if age <= self.ram_ttl:
@@ -81,27 +82,28 @@ class RedditCacheManager:
                 return entry["posts"]
             else:
                 log.debug(f"[cache:RAM] EXPIRED for {keyword!r} (age={age:.0f}s)")
-                del self.ram_cache[keyword]
+                del self.ram_cache[(keyword, nsfw)]
         else:
             log.debug(f"[cache:RAM] MISS for {keyword!r}")
         return None
 
-    async def get_from_disk(self, keyword: str) -> Optional[List[dict]]:
+    async def get_from_disk(self, keyword: str, nsfw: bool = False) -> Optional[List[dict]]:
         async with self.conn.execute(
-            "SELECT * FROM meme_cache WHERE keyword = ?", (keyword,)
+            "SELECT * FROM meme_cache WHERE keyword = ? AND is_nsfw = ?",
+            (keyword, int(nsfw)),
         ) as cursor:
             rows = await cursor.fetchall()
         if rows:
             log.debug(f"[cache:DISK] HIT for {keyword!r} ({len(rows)} rows)")
             posts = [dict(row) for row in rows]
             # refill RAM after a disk‐hit
-            self.cache_to_ram(keyword, posts)
+            self.cache_to_ram(keyword, posts, nsfw=nsfw)
             return posts
         else:
             log.debug(f"[cache:DISK] MISS for {keyword!r}")
         return None
 
-    async def save_to_disk(self, keyword: str, posts: List[dict]):
+    async def save_to_disk(self, keyword: str, posts: List[dict], nsfw: bool = False):
         now = int(time.time())
 
         rows = []
@@ -114,7 +116,7 @@ class RedditCacheManager:
                 post.get("url"),
                 post.get("media_url"),
                 post.get("author"),
-                int(post.get("is_nsfw", False)),
+                int(post.get("is_nsfw", nsfw)),
                 int(post.get("created_utc", now)),
                 now
             ))
@@ -147,10 +149,11 @@ class RedditCacheManager:
                     log.error("Failed to cache post %s: %s", row[2], ex)
             await self.conn.commit()
 
-    def record_failure(self, keyword: str) -> bool:
-        self.failed_count[keyword] += 1
-        if self.failed_count[keyword] >= self.keyword_failures:
-            self.disable_keyword(keyword)
+    def record_failure(self, keyword: str, nsfw: bool = False) -> bool:
+        key = (keyword, nsfw)
+        self.failed_count[key] += 1
+        if self.failed_count[key] >= self.keyword_failures:
+            self.disable_keyword(keyword, nsfw)
             return True
         return False
 
@@ -174,25 +177,30 @@ class RedditCacheManager:
         except aiosqlite.OperationalError as e:
             log.warning("VACUUM failed: %s", e)
 
-    async def refresh_keywords(self, keyword_list: List[str], fetch_fn):
+    async def refresh_keywords(self, keyword_list: List[Tuple[str, bool]], fetch_fn):
         async with self.lock:
             sem = asyncio.Semaphore(5)
 
-            async def refresh_one(keyword: str):
+            async def refresh_one(keyword: str, nsfw: bool):
                 async with sem:
-                    new_posts = await fetch_fn(keyword)
+                    new_posts = await fetch_fn(keyword, nsfw)
                     if new_posts:
-                        self.cache_to_ram(keyword, new_posts)
-                        await self.save_to_disk(keyword, new_posts)
+                        self.cache_to_ram(keyword, new_posts, nsfw)
+                        await self.save_to_disk(keyword, new_posts, nsfw)
 
-            tasks = [asyncio.create_task(refresh_one(keyword)) for keyword in keyword_list]
+            tasks = [
+                asyncio.create_task(refresh_one(keyword, nsfw))
+                for keyword, nsfw in keyword_list
+            ]
             results = await asyncio.gather(*tasks, return_exceptions=True)
 
-            for keyword, result in zip(keyword_list, results):
+            for (keyword, nsfw), result in zip(keyword_list, results):
                 if isinstance(result, Exception):
-                    print(f"[Refresh] Failed to refresh {keyword}: {result}")
+                    print(
+                        f"[Refresh] Failed to refresh {keyword} ({'NSFW' if nsfw else 'SFW'}): {result}"
+                    )
 
             self.clear_disabled()
 
-    def get_all_cached_keywords(self) -> List[str]:
+    def get_all_cached_keywords(self) -> List[Tuple[str, bool]]:
         return list(self.ram_cache.keys())

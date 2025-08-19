@@ -4,6 +4,7 @@ from discord import app_commands
 from discord.ext.commands import Context
 from .reddit_cache import RedditCacheManager
 from .meme_utils import extract_post_data
+from memer.helpers.guild_subreddits import DEFAULTS as SUB_DEFAULTS
 import yaml
 import os
 
@@ -43,7 +44,7 @@ class MemeCacheService:
             keyword_ttl=config.get("keyword_disable_ttl", 900),
         )
         self._fetch_semaphore = asyncio.Semaphore(2)
-        self._fallback_subs = ["memes", "dankmemes", "funny"]
+        self._fallback_subs = SUB_DEFAULTS  # {"sfw": [...], "nsfw": [...]} 
         self._started = False
 
     async def init(self):
@@ -63,33 +64,50 @@ class MemeCacheService:
         self._started = False
 
     async def get_cache_info(self) -> str:
-        ram_keywords = list(self.cache_mgr.ram_cache.keys())
-        ram_posts = sum(len(v["posts"]) for v in self.cache_mgr.ram_cache.values())
-        async with self.cache_mgr.conn.execute("SELECT COUNT(*) FROM meme_cache") as cur:
-            disk_count = (await cur.fetchone())[0]
+        ram_sfw_kw = [k for k, nsfw in self.cache_mgr.ram_cache.keys() if not nsfw]
+        ram_nsfw_kw = [k for k, nsfw in self.cache_mgr.ram_cache.keys() if nsfw]
+        ram_sfw_posts = sum(
+            len(v["posts"]) for (k, nsfw), v in self.cache_mgr.ram_cache.items() if not nsfw
+        )
+        ram_nsfw_posts = sum(
+            len(v["posts"]) for (k, nsfw), v in self.cache_mgr.ram_cache.items() if nsfw
+        )
+        async with self.cache_mgr.conn.execute(
+            "SELECT is_nsfw, COUNT(*) FROM meme_cache GROUP BY is_nsfw"
+        ) as cur:
+            rows = await cur.fetchall()
+        disk_counts = {row[0]: row[1] for row in rows}
+        disk_sfw = disk_counts.get(0, 0)
+        disk_nsfw = disk_counts.get(1, 0)
         disabled = len(self.cache_mgr.disabled_keywords)
 
         return (
-            f"🧠 RAM cache: {len(ram_keywords)} keywords, {ram_posts} posts\n"
-            f"💾 Disk cache: {disk_count} total posts\n"
+            f"🧠 RAM cache: SFW {len(ram_sfw_kw)} keywords, {ram_sfw_posts} posts | "
+            f"NSFW {len(ram_nsfw_kw)} keywords, {ram_nsfw_posts} posts\n"
+            f"💾 Disk cache: SFW {disk_sfw} posts | NSFW {disk_nsfw} posts\n"
             f"⛔ Disabled keywords: {disabled}"
         )
 
-    async def _fetch_keyword_posts(self, keyword):
+    async def _fetch_keyword_posts(self, keyword, nsfw):
+        subs = self._fallback_subs["nsfw" if nsfw else "sfw"]
+
         async def fetch_sub(sub_name):
             async with self._fetch_semaphore:
                 try:
                     sub = await self.reddit.subreddit(sub_name)
                     sub_results = []
                     async for post in sub.hot(limit=25):
-                        if keyword.lower() in (post.title or "").lower():
+                        if (
+                            keyword.lower() in (post.title or "").lower()
+                            and bool(post.over_18) == nsfw
+                        ):
                             sub_results.append(extract_post_data(post))
                     return sub_results
                 except Exception as e:
                     print(f"Error fetching {sub_name} for keyword {keyword}: {e}")
                     return []
 
-        results = await asyncio.gather(*(fetch_sub(name) for name in self._fallback_subs))
+        results = await asyncio.gather(*(fetch_sub(name) for name in subs))
         return [item for sublist in results for item in sublist]
 
     @tasks.loop(seconds=600)

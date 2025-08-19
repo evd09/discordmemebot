@@ -17,11 +17,11 @@ class DummyReddit:
 
 class DummyCacheManager:
     def get_all_cached_keywords(self):
-        return ["test"]
+        return [("test", False)]
 
     async def refresh_keywords(self, keywords, fetch_fn):
-        for kw in keywords:
-            await fetch_fn(kw)
+        for kw, nsfw in keywords:
+            await fetch_fn(kw, nsfw)
 
 
 async def old_style(iterations=1000):
@@ -33,7 +33,7 @@ async def old_style(iterations=1000):
         if not keywords:
             return
 
-        async def fetch_fn(keyword):
+        async def fetch_fn(keyword, nsfw):
             fallback_subs = ["memes", "dankmemes", "funny"]
             semaphore = asyncio.Semaphore(2)
 
