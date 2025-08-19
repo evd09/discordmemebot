@@ -46,11 +46,18 @@ class FakeSubreddit:
         self.display_name = name
 
     async def hot(self, limit):
-        for p in self.posts:
+        items = self.posts if isinstance(self.posts, list) else self.posts.get("hot", [])
+        for p in items:
             yield p
 
     async def top(self, limit):
-        for p in self.posts:
+        items = self.posts if isinstance(self.posts, list) else self.posts.get("top", [])
+        for p in items:
+            yield p
+
+    async def new(self, limit):
+        items = self.posts if isinstance(self.posts, list) else self.posts.get("new", [])
+        for p in items:
             yield p
 
 
@@ -164,3 +171,30 @@ def test_keyword_search_across_multiple_subreddits():
     assert titles == {"cat in sub1", "another cat here"}
     assert result.errors == []
     assert result.source_subreddit in {"sub1", "sub2"}
+
+
+def test_keyword_tries_multiple_listings():
+    random.seed(0)
+    post_map = {
+        "sub1": {
+            "hot": [FakePost("dog", subreddit="sub1")],
+            "new": [FakePost("cat appears", subreddit="sub1")],
+        }
+    }
+    reddit = FakeReddit(post_map)
+    cache = DummyCache()
+
+    result = asyncio.run(
+        fetch_meme(
+            reddit,
+            ["sub1"],
+            cache,
+            keyword="cat",
+            listings=("hot", "new"),
+            limit=10,
+            extract_fn=lambda p: {"title": p.title, "media_url": "url", "subreddit": p.subreddit.display_name},
+        )
+    )
+
+    assert result.listing == "new"
+    assert cache.cached is not None
