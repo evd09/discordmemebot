@@ -497,6 +497,9 @@ class Meme(commands.Cog):
             else:
                 embed_url = raw_url  # original for images
 
+            ID_CACHE[post.id] = True
+            HASH_CACHE[raw_url] = True
+
             embed = Embed(
                 title=post.title[:256],
                 url=f"https://reddit.com{post.permalink}",
