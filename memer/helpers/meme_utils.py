@@ -112,7 +112,12 @@ def get_reddit_url(url: str) -> str:
     log.debug("get_reddit_url input=%s", url)
     return url
 
-def extract_post_data(post):
+async def extract_post_data(post):
+    if hasattr(post, "load"):
+        try:
+            await post.load()
+        except Exception as e:
+            log.debug("post.load() failed for post.id=%s: %s", getattr(post, "id", "?"), e)
     try:
         raw_url = get_image_url(post)
         media_url = unescape(raw_url)
@@ -128,5 +133,5 @@ def extract_post_data(post):
         "media_url": media_url,
         "author": str(post.author) if post.author else "[deleted]",
         "is_nsfw": post.over_18,
-        "created_utc": int(post.created_utc)
+        "created_utc": int(post.created_utc),
     }
