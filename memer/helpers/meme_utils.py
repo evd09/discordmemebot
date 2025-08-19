@@ -22,10 +22,16 @@ async def send_meme(
     If embed is provided, set its image to `url` and send (embed + optional content).
     Otherwise just send the raw link (with optional content above it).
     """
-    if embed:
+    video_ext = (".mp4", ".webm")
+    is_video = url.lower().endswith(video_ext)
+
+    if embed and not is_video:
         embed.set_image(url=url)
 
-    text = f"{content}\n{url}" if content else url
+    if embed and not is_video:
+        text = content
+    else:
+        text = f"{content}\n{url}" if content else url
 
     if getattr(ctx, "interaction", None) and not ctx.interaction.response.is_done():
         try:
@@ -36,14 +42,14 @@ async def send_meme(
     try:
         if getattr(ctx, "interaction", None):
             if embed:
-                return await ctx.interaction.followup.send(content=content, embed=embed)
+                return await ctx.interaction.followup.send(content=text, embed=embed)
             log.debug("🔥 send_meme (plain link) → %s", text)
             return await ctx.interaction.followup.send(content=text)
     except discord.errors.NotFound:
         pass
 
     if embed:
-        return await ctx.send(content=content, embed=embed)
+        return await ctx.send(content=text, embed=embed)
     log.debug("🔥 send_meme fallback (plain link) → %s", text)
     return await ctx.send(text)
 
