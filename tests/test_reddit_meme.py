@@ -89,6 +89,8 @@ def test_keyword_filter_accepts_only_matching_posts():
     assert len(cache.cached) == 1
     assert cache.cached[0]["title"] == "The Cat returns"
     assert result.errors == []
+    assert isinstance(result.post, FakePost)
+    assert result.post.title == "The Cat returns"
 
 
 def test_keyword_filter_rejects_non_matching_posts():
@@ -112,6 +114,7 @@ def test_keyword_filter_rejects_non_matching_posts():
     assert cache.cached is None
     assert cache.failed is True
     assert result.errors == ["no valid posts"]
+    assert result.post is None
 
 
 def test_fetch_meme_supports_top_listing():
@@ -136,6 +139,7 @@ def test_fetch_meme_supports_top_listing():
     )
 
     assert result.listing == "top"
+    assert result.post.title == "Top meme"
 
 
 def test_keyword_search_across_multiple_subreddits():
@@ -164,6 +168,7 @@ def test_keyword_search_across_multiple_subreddits():
     assert titles == {"cat in sub1", "another cat here"}
     assert result.errors == []
     assert result.source_subreddit in {"sub1", "sub2"}
+    assert result.post.title in {"cat in sub1", "another cat here"}
 
 
 def test_fetch_meme_excludes_ids():
@@ -243,3 +248,4 @@ def test_keyword_iterates_listings_sequentially():
 
     assert cache.cached is not None
     assert result.listing == "top"
+    assert result.post.title == "cat"
