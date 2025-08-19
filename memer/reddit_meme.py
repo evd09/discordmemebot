@@ -219,6 +219,24 @@ async def fetch_meme(
     regex = re.compile(rf'\b{re.escape(keyword.lower())}\b') if keyword else None
     exclude_ids_set = set(exclude_ids or [])
 
+    RAND_SENTINEL = "__random__"
+    ram_random: List[dict] = []
+    disk_random: List[dict] = []
+    ram_random_ids: set = set()
+    disk_random_ids: set = set()
+    random_cache_ids: set = set()
+    random_cache_urls: set = set()
+    if not keyword:
+        ram_random = cache_mgr.get_from_ram(RAND_SENTINEL, nsfw=nsfw) or []
+        ram_random_ids = {p.get("post_id") for p in ram_random if p.get("post_id")}
+        disk_random = await cache_mgr.get_from_disk(RAND_SENTINEL, nsfw=nsfw) or []
+        disk_random_ids = {p.get("post_id") for p in disk_random if p.get("post_id")}
+        combined_random = ram_random + [p for p in disk_random if p.get("post_id") not in ram_random_ids]
+        random_cache_ids = ram_random_ids | disk_random_ids
+        random_cache_urls = {p.get("media_url") for p in combined_random if p.get("media_url")}
+    else:
+        combined_random = []
+
     def is_valid_post(p: Submission) -> bool:
         if not p or not getattr(p, "url", None):
             return False
@@ -230,6 +248,11 @@ async def fetch_meme(
         url = getattr(p, "url", None)
         if url and url in HASH_CACHE:
             return False
+        if not keyword:
+            if pid and pid in random_cache_ids:
+                return False
+            if url and url in random_cache_urls:
+                return False
         if regex and not regex.search((p.title or "").lower()):
             return False
         if filters and not all(f(p) for f in filters):
@@ -359,6 +382,39 @@ async def fetch_meme(
     subs = list(subreddits)
     random.shuffle(subs)
 
+    # 0️⃣ Check cache for random posts
+    if combined_random:
+        valid = [
+            p
+            for p in combined_random
+            if p.get("media_url")
+            and p.get("post_id") not in exclude_ids_set
+            and p.get("post_id") not in ID_CACHE
+            and p.get("media_url") not in HASH_CACHE
+        ]
+        if valid:
+            chosen = random.choice(valid)
+            class Cached:
+                title = chosen["title"]
+                permalink = f"/r/{chosen['subreddit']}/comments/{chosen['post_id']}/"
+                url = chosen["media_url"]
+                id = chosen["post_id"]
+                author = chosen.get("author") or "[deleted]"
+
+            ID_CACHE[chosen["post_id"]] = True
+            if chosen.get("media_url"):
+                HASH_CACHE[chosen["media_url"]] = True
+            source_listing = "cache_ram" if chosen["post_id"] in ram_random_ids else "cache_disk"
+            return MemeResult(
+                Cached,
+                chosen.get("subreddit"),
+                source_listing,
+                [chosen.get("subreddit")] if chosen.get("subreddit") else [],
+                [],
+                "cache",
+                chosen,
+            )
+
     # 1️⃣ Check warm cache buffers first
     for listing_choice in listings:
         for name in subs:
@@ -369,6 +425,11 @@ async def fetch_meme(
                     post = buf.pop()
                     if post and is_valid_post(post):
                         data = extract_fn(post)
+                        existing_rand = cache_mgr.get_from_ram(RAND_SENTINEL, nsfw=nsfw) or []
+                        if data.get("post_id") not in {p.get("post_id") for p in existing_rand}:
+                            existing_rand.append(data)
+                        cache_mgr.cache_to_ram(RAND_SENTINEL, existing_rand, nsfw=nsfw)
+                        await cache_mgr.save_to_disk(RAND_SENTINEL, [data], nsfw=nsfw)
                         if getattr(post, "id", None):
                             ID_CACHE[post.id] = True
                         url = getattr(post, "url", None)
@@ -394,6 +455,11 @@ async def fetch_meme(
                 key = f"{name}_{listing_choice}"
                 buf = WARM_CACHE.setdefault(key, deque(maxlen=limit))
                 buf.appendleft(choice_post)
+                existing_rand = cache_mgr.get_from_ram(RAND_SENTINEL, nsfw=nsfw) or []
+                if data.get("post_id") not in {p.get("post_id") for p in existing_rand}:
+                    existing_rand.append(data)
+                cache_mgr.cache_to_ram(RAND_SENTINEL, existing_rand, nsfw=nsfw)
+                await cache_mgr.save_to_disk(RAND_SENTINEL, [data], nsfw=nsfw)
                 if getattr(choice_post, "id", None):
                     ID_CACHE[choice_post.id] = True
                 url = getattr(choice_post, "url", None)
@@ -409,6 +475,11 @@ async def fetch_meme(
     post = await simple_random_meme(reddit, chosen_sub)
     if post and is_valid_post(post):
         data = extract_fn(post)
+        existing_rand = cache_mgr.get_from_ram(RAND_SENTINEL, nsfw=nsfw) or []
+        if data.get("post_id") not in {p.get("post_id") for p in existing_rand}:
+            existing_rand.append(data)
+        cache_mgr.cache_to_ram(RAND_SENTINEL, existing_rand, nsfw=nsfw)
+        await cache_mgr.save_to_disk(RAND_SENTINEL, [data], nsfw=nsfw)
         if getattr(post, "id", None):
             ID_CACHE[post.id] = True
         url = getattr(post, "url", None)
