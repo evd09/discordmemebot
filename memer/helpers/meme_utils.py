@@ -60,6 +60,19 @@ def get_image_url(post: Submission) -> str:
     url = post.url
     log.debug("get_image_url: id=%s url=%s", post.id, url)
 
+    for media_attr in ("media", "secure_media"):
+        media = getattr(post, media_attr, None)
+        if media and (rv := media.get("reddit_video")):
+            fallback = rv.get("fallback_url")
+            if fallback:
+                log.debug(
+                    "Using %s reddit_video fallback for post.id=%s: %s",
+                    media_attr,
+                    post.id,
+                    fallback,
+                )
+                return fallback
+
     if url.lower().endswith(".gif"):
         log.debug("Matched .gif directly for post.id=%s", post.id)
         return url
