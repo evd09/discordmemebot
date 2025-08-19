@@ -1,6 +1,8 @@
 # cogs/meme_admin.py
 import time
 from typing import Optional
+from pathlib import Path
+import subprocess
 
 import discord
 from discord.ext import commands
@@ -17,6 +19,7 @@ from .audio.voice_error_manager import reset_total_failures
 from .audio.audio_events import get_guild_config
 from .audio.beep import load_beeps
 from .audio.audio_player import preload_audio_clips, audio_cache
+from .audio.constants import SOUND_FOLDER
 
 
 class AddSubredditModal(discord.ui.Modal, title="Add Subreddit"):
@@ -307,6 +310,32 @@ class MemeAdmin(commands.Cog):
         )
 
     async def handle_reloadsounds(self, interaction: discord.Interaction):
+        sound_path = Path(SOUND_FOLDER)
+        if sound_path.exists():
+            for file in sound_path.iterdir():
+                if file.suffix.lower() == ".mp3":
+                    tmp_file = file.with_suffix(".tmp.mp3")
+                    try:
+                        subprocess.run(
+                            ["ffmpeg", "-y", "-i", str(file), "-c", "copy", str(tmp_file)],
+                            check=True,
+                            stdout=subprocess.DEVNULL,
+                            stderr=subprocess.DEVNULL,
+                        )
+                        tmp_file.replace(file)
+                    except subprocess.CalledProcessError:
+                        ogg_file = file.with_suffix(".ogg")
+                        try:
+                            subprocess.run(
+                                ["ffmpeg", "-y", "-i", str(file), str(ogg_file)],
+                                check=True,
+                                stdout=subprocess.DEVNULL,
+                                stderr=subprocess.DEVNULL,
+                            )
+                            file.unlink()
+                        except subprocess.CalledProcessError:
+                            if ogg_file.exists():
+                                ogg_file.unlink()
         load_beeps()
         entrance_cog = self.bot.get_cog("Entrance")
         if entrance_cog and hasattr(entrance_cog, "reload_cache"):
