@@ -182,11 +182,10 @@ class Meme(commands.Cog):
         # ─── BUILD EMBED ─────────────────────────────────────
         embed = Embed(
             title=post.title,
-            url=f"https://reddit.com{post.permalink}"
+            url=f"https://reddit.com{post.permalink}",
+            description=f"r/{result.source_subreddit} • u/{post.author}"
         )
-        embed.set_footer(
-            text=f"r/{result.source_subreddit} • via {result.picked_via.upper()}"
-        )
+        embed.set_footer(text=f"via {result.picked_via.upper()}")
 
         raw_url   = get_image_url(post)
         embed_url = get_rxddit_url(raw_url)
@@ -201,7 +200,7 @@ class Meme(commands.Cog):
             ctx._chosen_fallback = True
 
         try:
-            sent = await send_meme(ctx, url=raw_url, content=content)
+            sent = await send_meme(ctx, url=embed_url, content=content, embed=embed)
             log.info("✅ send_meme succeeded message_id=%s", sent.id)
         except Exception:
             log.exception("Error in send_meme")
@@ -269,11 +268,10 @@ class Meme(commands.Cog):
         # ─── BUILD EMBED ─────────────────────────────────────
         embed = Embed(
             title=post.title,
-            url=f"https://reddit.com{post.permalink}"
+            url=f"https://reddit.com{post.permalink}",
+            description=f"r/{result.source_subreddit} • u/{post.author}"
         )
-        embed.set_footer(
-            text=f"r/{result.source_subreddit} • via {result.picked_via.upper()}"
-        )
+        embed.set_footer(text=f"via {result.picked_via.upper()}")
 
         raw_url   = get_image_url(post)
         embed_url = get_rxddit_url(raw_url)
@@ -288,7 +286,7 @@ class Meme(commands.Cog):
             ctx._chosen_fallback = True
 
         try:
-            sent = await send_meme(ctx, url=raw_url, content=content)
+            sent = await send_meme(ctx, url=embed_url, content=content, embed=embed)
             log.info("✅ NSFW send_meme succeeded message_id=%s", sent.id)
         except Exception:
             log.exception("Error in send_meme")
@@ -369,8 +367,9 @@ class Meme(commands.Cog):
             embed = Embed(
                 title=post.title[:256],
                 url=f"https://reddit.com{post.permalink}",
-                description=f"r/{subreddit} • u/{post.author}"
+                description=f"r/{result.source_subreddit} • u/{post.author}"
             )
+            embed.set_footer(text=f"via {result.picked_via.upper()}")
 
             content = None
             if getattr(result, "picked_via", None) == "random":
