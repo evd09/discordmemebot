@@ -4,6 +4,7 @@ from html import unescape
 from discord import Embed
 from typing import Optional
 from discord.ext.commands import Context
+from urllib.parse import urlparse
 import discord
 
 log = logging.getLogger(__name__)
@@ -23,7 +24,10 @@ async def send_meme(
     (e.g., videos), the URL is included in the message content so Discord
     can generate its own preview.
     """
-    is_image = url.lower().endswith(IMAGE_EXT)
+    # Some Reddit image URLs include query parameters (e.g. ``.jpg?width=640``)
+    # which would cause a simple ``endswith`` check to fail. Parse the URL and
+    # inspect only the path so such URLs are still treated as images.
+    is_image = urlparse(url).path.lower().endswith(IMAGE_EXT)
 
     # If this is an image, attach it to the embed; otherwise, fall back to
     # sending the URL directly so Discord can unfurl videos/gifs.
