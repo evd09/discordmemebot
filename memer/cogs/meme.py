@@ -196,7 +196,7 @@ class Meme(commands.Cog):
         if keyword and not got_keyword:
             content = (
                 f"🔍 Sorry, I couldn’t find any memes containing `{keyword}`—"
-                " here’s a random one instead!"
+                " here is a random one (random fallback)"
             )
             ctx._chosen_fallback = True
 
@@ -283,7 +283,7 @@ class Meme(commands.Cog):
         if keyword and not got_keyword:
             content = (
                 f"🔍 Sorry, I couldn’t find any NSFW memes containing `{keyword}`—"
-                " here’s a random one instead!"
+                " here is a random one (random fallback)"
             )
             ctx._chosen_fallback = True
 
@@ -384,7 +384,7 @@ class Meme(commands.Cog):
 
             content = None
             if getattr(result, "picked_via", None) == "random":
-                content = "🔀 (random fallback)"
+                content = "here is a random one (random fallback)"
 
             sent = await send_meme(
                 ctx,
