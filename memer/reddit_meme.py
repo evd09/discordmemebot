@@ -244,6 +244,7 @@ async def fetch_meme(
                 permalink = f"/r/{chosen['subreddit']}/comments/{chosen['post_id']}/"
                 url       = chosen["media_url"]
                 id        = chosen["post_id"]
+                author    = chosen.get("author") or "[deleted]"
             return MemeResult(Cached, chosen["subreddit"], "cache_disk", [keyword], [], "cache")
 
         # (3) Disabled?
