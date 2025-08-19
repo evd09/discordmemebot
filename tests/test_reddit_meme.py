@@ -49,6 +49,10 @@ class FakeSubreddit:
         for p in self.posts:
             yield p
 
+    async def best(self, limit):
+        for p in self.posts:
+            yield p
+
 
 class FakeReddit:
     def __init__(self, posts):
@@ -102,3 +106,27 @@ def test_keyword_filter_rejects_non_matching_posts():
     assert cache.cached is None
     assert cache.failed is True
     assert result.errors == ["no valid posts"]
+
+
+def test_fetch_meme_supports_best_listing():
+    random.seed(0)
+    posts = [FakePost("Best meme")] 
+    reddit = FakeReddit(posts)
+    cache = DummyCache()
+
+    result = asyncio.run(
+        fetch_meme(
+            reddit,
+            ["testsub"],
+            cache,
+            listings=("best",),
+            limit=10,
+            extract_fn=lambda p: {
+                "title": p.title,
+                "media_url": "url",
+                "subreddit": "testsub",
+            },
+        )
+    )
+
+    assert result.listing == "best"
