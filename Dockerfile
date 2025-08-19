@@ -11,7 +11,7 @@ RUN apt-get update \
 
 WORKDIR /app
 
-# ── Pre-create sounds directory with permissive permissions ──
+# ── Create sounds directory ──
 RUN mkdir -p /app/sounds \
     && chmod 777 /app/sounds
 
@@ -19,15 +19,17 @@ RUN mkdir -p /app/sounds \
 ARG UID=1000
 ARG GID=1000
 RUN groupadd -g $GID app && useradd -u $UID -g app -m app
-RUN chown -R app:app /app/sounds
-USER app
 
 # ── Copy & install Python deps ──
 COPY . .
-RUN pip install --no-cache-dir -r requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt \
  && pip install --no-cache-dir "git+https://github.com/Rapptz/discord.py#egg=discord.py[voice]"
 
+# ── Add entrypoint ──
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
 ENV PYTHONUNBUFFERED=1
 
+ENTRYPOINT ["/entrypoint.sh"]
 CMD ["python", "-u", "-m", "memer.bot"]
