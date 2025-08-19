@@ -6,6 +6,7 @@ from typing import Optional
 from discord.ext.commands import Context
 from urllib.parse import urlparse
 import discord
+import re
 
 log = logging.getLogger(__name__)
 
@@ -89,6 +90,20 @@ def get_image_url(post: Submission) -> str:
             return mp4_url
     except Exception as e:
         log.debug("No usable preview variants for post.id=%s: %s", post.id, e)
+
+    for embed_attr in ("secure_media_embed", "media_embed"):
+        embed = getattr(post, embed_attr, None)
+        if embed and (content := embed.get("content")):
+            match = re.search(r'src=["\']([^"\']+)', content)
+            if match:
+                embed_url = match.group(1)
+                log.debug(
+                    "Using %s embed src for post.id=%s: %s",
+                    embed_attr,
+                    post.id,
+                    embed_url,
+                )
+                return embed_url
 
     if url.lower().endswith(IMAGE_EXT):
         log.debug("Using image extension URL for post.id=%s: %s", post.id, url)
