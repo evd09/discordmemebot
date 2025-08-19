@@ -194,3 +194,52 @@ def test_fetch_meme_excludes_ids():
     )
 
     assert chosen == ["a2"]
+
+
+def test_keyword_iterates_listings_sequentially():
+    random.seed(0)
+
+    class MultiListingSubreddit:
+        def __init__(self, name, posts_map):
+            self.display_name = name
+            self.posts_map = posts_map
+
+        async def hot(self, limit):
+            for p in self.posts_map.get("hot", []):
+                yield p
+
+        async def top(self, limit):
+            for p in self.posts_map.get("top", []):
+                yield p
+
+    class MultiListingReddit:
+        def __init__(self, mapping):
+            self.mapping = mapping
+
+        async def subreddit(self, name):
+            return MultiListingSubreddit(name, self.mapping[name])
+
+    mapping = {
+        "testsub": {
+            "hot": [FakePost("dog")],
+            "top": [FakePost("cat")],
+        }
+    }
+
+    reddit = MultiListingReddit(mapping)
+    cache = DummyCache()
+
+    result = asyncio.run(
+        fetch_meme(
+            reddit,
+            ["testsub"],
+            cache,
+            keyword="cat",
+            listings=("hot", "top"),
+            limit=10,
+            extract_fn=lambda p: {"title": p.title, "media_url": "url", "subreddit": "testsub"},
+        )
+    )
+
+    assert cache.cached is not None
+    assert result.listing == "top"
