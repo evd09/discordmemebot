@@ -453,13 +453,21 @@ class Meme(commands.Cog):
                  ctx.guild.id, ctx.author.id, subreddit, keyword)
 
         # 1) Defer to give us 3s
-        await ctx.defer()
+        try:
+            await ctx.defer()
+        except discord.errors.NotFound:
+            pass
 
         # 2) Lookup subreddit
         try:
             sub = await self.reddit.subreddit(subreddit, fetch=True)
         except (NotFound, Forbidden):
-            return await ctx.reply(f"r/{subreddit} is not available :/", ephemeral=True)
+            if ctx.interaction:
+                return await ctx.interaction.followup.send(
+                    f"r/{subreddit} is not available :/",
+                    ephemeral=True,
+                )
+            return await ctx.send(f"r/{subreddit} is not available :/")
 
         # 3) Fetch via pipeline (or random fallback)
         post = None
