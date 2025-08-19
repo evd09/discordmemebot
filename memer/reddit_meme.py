@@ -229,6 +229,10 @@ async def fetch_meme(
 
     regex = re.compile(rf'\b{re.escape(keyword.lower())}\b') if keyword else None
     exclude_ids_set = set(exclude_ids or [])
+    subreddit_names = {
+        getattr(s, "display_name", str(s)).lower()
+        for s in subreddits
+    }
 
     RAND_SENTINEL = "__random__"
     ram_random: List[dict] = []
@@ -278,7 +282,9 @@ async def fetch_meme(
             valid = [
                 p
                 for p in posts
-                if p.get("media_url") and p.get("post_id") not in exclude_ids_set
+                if p.get("media_url")
+                and p.get("post_id") not in exclude_ids_set
+                and p.get("subreddit", "").lower() in subreddit_names
             ]
             if valid:
                 chosen = random.choice(valid)
@@ -308,7 +314,9 @@ async def fetch_meme(
             valid = [
                 p
                 for p in posts
-                if p.get("media_url") and p.get("post_id") not in exclude_ids_set
+                if p.get("media_url")
+                and p.get("post_id") not in exclude_ids_set
+                and p.get("subreddit", "").lower() in subreddit_names
             ]
             if valid:
                 chosen = random.choice(valid)
