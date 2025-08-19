@@ -252,8 +252,9 @@ async def fetch_meme(
             return MemeResult(None, None, None, [keyword], ["disabled"], "fallback")
 
         # (4) Live Reddit fetch from a single randomly-chosen subreddit
-        posts = []
+        posts: List[Dict] = []
         chosen = None
+        chosen_post: Optional[Submission] = None
         count = 0
         # pick exactly one sub per invocation
         sub_to_try = random.choice(subreddits)
@@ -267,15 +268,18 @@ async def fetch_meme(
                     count += 1
                     if random.randrange(count) == 0:
                         chosen = data
+                        chosen_post = post
         except Exception:
             posts = []
+            chosen = None
+            chosen_post = None
 
         if posts:
             cache_mgr.cache_to_ram(keyword, posts, nsfw=nsfw)
             await cache_mgr.save_to_disk(keyword, posts, nsfw=nsfw)
             chosen = chosen or random.choice(posts)
             return MemeResult(
-                None,
+                chosen_post,
                 chosen.get("subreddit"),
                 "reddit",
                 [keyword],
