@@ -257,6 +257,28 @@ Subreddit management is handled through `/memeadmin` buttons or automatic refres
 | /beeps        | Play a random beep or choose one        |
 
 
+## 🛠️ Slash Command Migration ##
+When migrating or renaming slash commands, Discord may retain old registrations
+for a short period. The scripts below help manage these transitions:
+
+- `scripts/list_commands.py` – list existing global and guild commands.
+- `scripts/clear_commands.py <name ...>` – delete commands matching the given
+  names.
+
+Both scripts require `DISCORD_TOKEN` and `APPLICATION_ID` environment
+variables. Set `GUILD_ID` to target a specific guild during testing.
+
+Example usage:
+
+```
+export DISCORD_TOKEN=...
+export APPLICATION_ID=...
+export GUILD_ID=...
+python scripts/clear_commands.py oldcmd1 oldcmd2
+```
+
+Run the listing script afterward to verify removal.
+
 ## 🎉 Contributing & Testing ##
 - Open issues or PRs for improvements.
 - Use a test guild (GUILD_ID) to verify slash command syncing.
