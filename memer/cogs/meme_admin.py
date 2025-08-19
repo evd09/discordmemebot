@@ -563,6 +563,7 @@ class MemeAdmin(commands.Cog):
         )
 
     async def handle_reloadsounds(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
         sound_path = Path(SOUND_FOLDER)
         if sound_path.exists():
             for file in sound_path.iterdir():
@@ -595,7 +596,7 @@ class MemeAdmin(commands.Cog):
             entrance_cog.reload_cache()
         audio_cache.cache.clear()
         preload_audio_clips()
-        await interaction.response.send_message(
+        await interaction.followup.send(
             "✅ Beep and entrance sounds reloaded.", ephemeral=True
         )
 
