@@ -45,6 +45,8 @@ from memer.reddit_meme import (
     start_warmup,
     stop_warmup,
     WARM_CACHE,
+    ID_CACHE,
+    HASH_CACHE,
 )
 from memer.helpers.reddit_config import start_observer, stop_observer
 
@@ -128,6 +130,13 @@ class Meme(commands.Cog):
         # 2️⃣ Resolve URLs
         raw_url   = post_dict.get("media_url") or post_dict.get("url")
         embed_url = get_reddit_url(raw_url)
+
+        # record in global caches to avoid future duplicates
+        pid = post_dict.get("post_id")
+        if pid:
+            ID_CACHE[pid] = True
+        if raw_url:
+            HASH_CACHE[raw_url] = True
 
         # 3️⃣ Send
         sent = await send_meme(ctx, url=embed_url, embed=embed)

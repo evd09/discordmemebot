@@ -222,7 +222,13 @@ async def fetch_meme(
     def is_valid_post(p: Submission) -> bool:
         if not p or not getattr(p, "url", None):
             return False
-        if exclude_ids_set and getattr(p, "id", None) in exclude_ids_set:
+        pid = getattr(p, "id", None)
+        if pid and pid in ID_CACHE:
+            return False
+        if exclude_ids_set and pid in exclude_ids_set:
+            return False
+        url = getattr(p, "url", None)
+        if url and url in HASH_CACHE:
             return False
         if regex and not regex.search((p.title or "").lower()):
             return False
@@ -249,6 +255,9 @@ async def fetch_meme(
                     id = chosen["post_id"]
                     author = chosen.get("author") or "[deleted]"
 
+                ID_CACHE[chosen["post_id"]] = True
+                if chosen.get("media_url"):
+                    HASH_CACHE[chosen["media_url"]] = True
                 return MemeResult(
                     Cached,
                     chosen.get("subreddit"),
@@ -276,6 +285,9 @@ async def fetch_meme(
                     id = chosen["post_id"]
                     author = chosen.get("author") or "[deleted]"
 
+                ID_CACHE[chosen["post_id"]] = True
+                if chosen.get("media_url"):
+                    HASH_CACHE[chosen["media_url"]] = True
                 return MemeResult(
                     Cached,
                     chosen["subreddit"],
@@ -317,6 +329,11 @@ async def fetch_meme(
             cache_mgr.cache_to_ram(keyword, cache_posts, nsfw=nsfw)
             await cache_mgr.save_to_disk(keyword, cache_posts, nsfw=nsfw)
             chosen_post, chosen_data = random.choice(posts)
+            if getattr(chosen_post, "id", None):
+                ID_CACHE[chosen_post.id] = True
+            url = getattr(chosen_post, "url", None)
+            if url:
+                HASH_CACHE[url] = True
             return MemeResult(
                 chosen_post,
                 chosen_data.get("subreddit"),
@@ -341,6 +358,25 @@ async def fetch_meme(
     tried: List[str] = []
     subs = list(subreddits)
     random.shuffle(subs)
+
+    # 1️⃣ Check warm cache buffers first
+    for listing_choice in listings:
+        for name in subs:
+            key = f"{name}_{listing_choice}"
+            buf = WARM_CACHE.get(key)
+            if buf:
+                while buf:
+                    post = buf.pop()
+                    if post and is_valid_post(post):
+                        data = extract_fn(post)
+                        if getattr(post, "id", None):
+                            ID_CACHE[post.id] = True
+                        url = getattr(post, "url", None)
+                        if url:
+                            HASH_CACHE[url] = True
+                        return MemeResult(post, name, listing_choice, [name], [], "warm", data)
+
+    # 2️⃣ Live fetch
     for name in subs:
         tried.append(name)
         try:
@@ -355,6 +391,14 @@ async def fetch_meme(
                         choice_post = post
             if choice_post:
                 data = extract_fn(choice_post)
+                key = f"{name}_{listing_choice}"
+                buf = WARM_CACHE.setdefault(key, deque(maxlen=limit))
+                buf.appendleft(choice_post)
+                if getattr(choice_post, "id", None):
+                    ID_CACHE[choice_post.id] = True
+                url = getattr(choice_post, "url", None)
+                if url:
+                    HASH_CACHE[url] = True
                 return MemeResult(choice_post, name, listing_choice, tried, [], "fallback", data)
         except Exception:
             continue
@@ -365,6 +409,11 @@ async def fetch_meme(
     post = await simple_random_meme(reddit, chosen_sub)
     if post and is_valid_post(post):
         data = extract_fn(post)
+        if getattr(post, "id", None):
+            ID_CACHE[post.id] = True
+        url = getattr(post, "url", None)
+        if url:
+            HASH_CACHE[url] = True
         return MemeResult(post, chosen_sub, "random", tried, [], "random", data)
 
     # ─── total failure ────────────────────────────────────

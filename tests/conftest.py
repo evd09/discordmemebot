@@ -1,6 +1,10 @@
 import sys
+import os
 import types
 from types import SimpleNamespace
+
+# Ensure project root on path
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 # Stub asyncpraw with minimal Reddit and Submission
 asyncpraw = types.ModuleType("asyncpraw")
@@ -100,3 +104,14 @@ sys.modules.setdefault("discord.ext", ext_module)
 sys.modules.setdefault("discord.ext.commands", commands_module)
 sys.modules.setdefault("discord.ext.tasks", tasks_module)
 sys.modules.setdefault("discord.app_commands", discord_stub.app_commands)
+
+# Ensure global caches are clean for each test
+import pytest
+from memer import reddit_meme as meme_mod
+
+
+@pytest.fixture(autouse=True)
+def _clear_caches():
+    meme_mod.ID_CACHE.clear()
+    meme_mod.HASH_CACHE.clear()
+    meme_mod.WARM_CACHE.clear()
