@@ -37,10 +37,10 @@ class DummyCache:
 def test_r_subreddit_keyword_filters_cached_posts(monkeypatch):
     posts = [
         {
-            'title': 'python cat',
+            'title': 'memes cat',
             'media_url': 'https://example.com/p.jpg',
             'post_id': 'p1',
-            'subreddit': 'python',
+            'subreddit': 'memes',
             'author': 'alice',
         },
         {
@@ -103,6 +103,6 @@ def test_r_subreddit_keyword_filters_cached_posts(monkeypatch):
     ctx.defer = fake_defer
 
     random.seed(0)
-    asyncio.run(Meme.r_(meme_cog, ctx, 'python', keyword='cat'))
+    asyncio.run(Meme.r_(meme_cog, ctx, 'memes', keyword='cat'))
 
-    assert captured_result['result'].post_dict['subreddit'] == 'python'
+    assert captured_result['result'].post_dict['subreddit'] == 'memes'

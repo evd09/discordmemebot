@@ -207,3 +207,45 @@ class RedditCacheManager:
 
     def get_all_cached_keywords(self) -> List[Tuple[str, bool]]:
         return list(self.ram_cache.keys())
+
+
+class NoopCacheManager:
+    """Minimal cache manager that effectively disables caching.
+
+    Provides the same interface as :class:`RedditCacheManager` but all
+    operations are no-ops.  Used when a subreddit is not part of the loaded
+    list and we want to bypass cache lookups entirely.
+    """
+
+    async def init(self):  # pragma: no cover - interface compatibility
+        return None
+
+    def get_from_ram(self, *args, **kwargs):
+        return None
+
+    async def get_from_disk(self, *args, **kwargs):
+        return None
+
+    def is_disabled(self, *args, **kwargs):
+        return False
+
+    def cache_to_ram(self, *args, **kwargs):
+        return None
+
+    async def save_to_disk(self, *args, **kwargs):
+        return None
+
+    def record_failure(self, *args, **kwargs):
+        return False
+
+    def clear_disabled(self):
+        return None
+
+    async def flush_expired_disk(self, *args, **kwargs):  # pragma: no cover
+        return None
+
+    async def refresh_keywords(self, *args, **kwargs):  # pragma: no cover
+        return None
+
+    def get_all_cached_keywords(self):
+        return []
