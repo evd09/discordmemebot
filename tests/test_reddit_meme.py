@@ -73,6 +73,9 @@ def test_keyword_filter_accepts_only_matching_posts():
     reddit = FakeReddit(posts)
     cache = DummyCache()
 
+    async def extract_fn(p):
+        return {"title": p.title, "media_url": "url", "subreddit": "testsub"}
+
     result = asyncio.run(
         fetch_meme(
             reddit,
@@ -81,7 +84,7 @@ def test_keyword_filter_accepts_only_matching_posts():
             keyword="cat",
             listings=("hot",),
             limit=10,
-            extract_fn=lambda p: {"title": p.title, "media_url": "url", "subreddit": "testsub"},
+            extract_fn=extract_fn,
         )
     )
 
@@ -97,6 +100,9 @@ def test_keyword_filter_rejects_non_matching_posts():
     reddit = FakeReddit(posts)
     cache = DummyCache()
 
+    async def extract_fn(p):
+        return {"title": p.title, "media_url": "url", "subreddit": "testsub"}
+
     result = asyncio.run(
         fetch_meme(
             reddit,
@@ -105,7 +111,7 @@ def test_keyword_filter_rejects_non_matching_posts():
             keyword="cat",
             listings=("hot",),
             limit=10,
-            extract_fn=lambda p: {"title": p.title, "media_url": "url", "subreddit": "testsub"},
+            extract_fn=extract_fn,
         )
     )
 
@@ -120,6 +126,9 @@ def test_fetch_meme_supports_top_listing():
     reddit = FakeReddit(posts)
     cache = DummyCache()
 
+    async def extract_fn(p):
+        return {"title": p.title, "media_url": "url", "subreddit": "testsub"}
+
     result = asyncio.run(
         fetch_meme(
             reddit,
@@ -127,11 +136,7 @@ def test_fetch_meme_supports_top_listing():
             cache,
             listings=("top",),
             limit=10,
-            extract_fn=lambda p: {
-                "title": p.title,
-                "media_url": "url",
-                "subreddit": "testsub",
-            },
+            extract_fn=extract_fn,
         )
     )
 
@@ -147,6 +152,9 @@ def test_keyword_search_across_multiple_subreddits():
     reddit = FakeReddit(post_map)
     cache = DummyCache()
 
+    async def extract_fn(p):
+        return {"title": p.title, "media_url": "url", "subreddit": p.subreddit.display_name}
+
     result = asyncio.run(
         fetch_meme(
             reddit,
@@ -155,7 +163,7 @@ def test_keyword_search_across_multiple_subreddits():
             keyword="cat",
             listings=("hot",),
             limit=10,
-            extract_fn=lambda p: {"title": p.title, "media_url": "url", "subreddit": p.subreddit.display_name},
+            extract_fn=extract_fn,
         )
     )
 
@@ -177,7 +185,7 @@ def test_fetch_meme_excludes_ids():
 
     chosen = []
 
-    def extract_fn(p):
+    async def extract_fn(p):
         chosen.append(p.id)
         return {"title": p.title, "media_url": "url", "subreddit": "testsub"}
 

@@ -101,7 +101,7 @@ class MemeCacheService:
                             keyword.lower() in (post.title or "").lower()
                             and bool(post.over_18) == nsfw
                         ):
-                            sub_results.append(extract_post_data(post))
+                            sub_results.append(await extract_post_data(post))
                     return sub_results
                 except Exception as e:
                     print(f"Error fetching {sub_name} for keyword {keyword}: {e}")

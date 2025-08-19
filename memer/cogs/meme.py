@@ -160,7 +160,7 @@ class Meme(commands.Cog):
                         post = buf.pop()
                         if not post:
                             continue
-                        data = extract_post_data(post)
+                        data = await extract_post_data(post)
                         await self._send_cached(ctx, data, keyword or "", "WARM CACHE", nsfw)
                         return True
 
@@ -262,7 +262,7 @@ class Meme(commands.Cog):
         )
         embed.set_footer(text=f"via {result.picked_via.upper()}")
 
-        raw_url   = get_image_url(post)
+        raw_url   = await get_image_url(post)
         embed_url = get_rxddit_url(raw_url)
 
         # only apologize if they asked for keyword but got no hits
@@ -376,7 +376,7 @@ class Meme(commands.Cog):
         )
         embed.set_footer(text=f"via {result.picked_via.upper()}")
 
-        raw_url   = get_image_url(post)
+        raw_url   = await get_image_url(post)
         embed_url = get_rxddit_url(raw_url)
 
         # only apologize if they asked for keyword but got no hits
@@ -477,7 +477,7 @@ class Meme(commands.Cog):
                     f"✅ No fresh posts in r/{subreddit} right now—try again later!"
                 )
 
-            raw_url = get_image_url(post)
+            raw_url = await get_image_url(post)
             if raw_url.endswith(('.mp4', '.webm')):
                 embed_url = get_rxddit_url(raw_url)  # use proxy for videos
             else:

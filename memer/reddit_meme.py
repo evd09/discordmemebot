@@ -292,7 +292,7 @@ async def fetch_meme(
             for sub_name, post_list in posts_by_sub.items():
                 for post in post_list:
                     if is_valid_post(post):
-                        data = extract_fn(post)
+                        data = await extract_fn(post)
                         posts.append(data)
         except Exception:
             posts = []
@@ -337,7 +337,7 @@ async def fetch_meme(
                     if random.randrange(count) == 0:
                         choice_post = post
             if choice_post:
-                data = extract_fn(choice_post)
+                data = await extract_fn(choice_post)
                 return MemeResult(None, name, listing_choice, tried, [], "fallback")
         except Exception:
             continue
@@ -347,7 +347,7 @@ async def fetch_meme(
     chosen_sub = raw.display_name if hasattr(raw, "display_name") else str(raw)
     post = await simple_random_meme(reddit, chosen_sub)
     if post and is_valid_post(post):
-        data = extract_fn(post)
+        data = await extract_fn(post)
         return MemeResult(None, chosen_sub, "random", tried, [], "random")
 
     # ─── total failure ────────────────────────────────────

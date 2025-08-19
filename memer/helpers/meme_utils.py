@@ -53,9 +53,17 @@ async def send_meme(
 
     return await ctx.send(content=text, embed=embed)
 
-def get_image_url(post: Submission) -> str:
+async def get_image_url(post: Submission) -> str:
     url = post.url
     log.debug("get_image_url: id=%s url=%s", post.id, url)
+
+    # Some posts (especially from warm caches) may not have a ``preview``
+    # attribute loaded yet. Ensure we fetch full data before inspecting it.
+    if not hasattr(post, "preview"):
+        try:
+            await post.load()
+        except Exception as e:
+            log.debug("post.load() failed for post.id=%s: %s", post.id, e)
 
     if url.lower().endswith(".gif"):
         log.debug("Matched .gif directly for post.id=%s", post.id)
@@ -96,9 +104,9 @@ def get_rxddit_url(url: str) -> str:
     log.debug("get_rxddit_url input=%s", url)
     return url
 
-def extract_post_data(post):
+async def extract_post_data(post):
     try:
-        raw_url = get_image_url(post)
+        raw_url = await get_image_url(post)
         media_url = unescape(raw_url)
     except Exception as e:
         log.warning("Failed to resolve media_url for post.id=%s: %s", post.id, e)
