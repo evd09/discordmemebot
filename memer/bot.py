@@ -124,10 +124,18 @@ async def cleanup_all_voice(bot):
         try:
             vc = guild.voice_client
             if vc and vc.is_connected():
-                print(f"[STARTUP CLEANUP] Disconnecting from voice in {guild.name} ({guild.id})...")
+                log.info(
+                    "[STARTUP CLEANUP] Disconnecting from voice in %s (%s)...",
+                    guild.name,
+                    guild.id,
+                )
                 await vc.disconnect(force=True)
         except Exception as e:
-            print(f"[STARTUP CLEANUP ERROR] {guild.name}: {e}")
+            log.error(
+                "[STARTUP CLEANUP ERROR] %s: %s",
+                guild.name,
+                e,
+            )
 
 
 async def sync_app_commands(bot: commands.Bot) -> None:
