@@ -30,6 +30,10 @@ async def init() -> None:
         if _conn is not None:
             return
 
+        db_dir = os.path.dirname(DB_PATH)
+        if db_dir:
+            os.makedirs(db_dir, exist_ok=True)
+
         _conn = await aiosqlite.connect(DB_PATH)
         await _conn.executescript(
             """

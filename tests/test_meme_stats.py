@@ -33,3 +33,19 @@ def test_leaderboards_reflect_counts(tmp_path):
     assert top_subreddits[0] == ("learnpython", 2)
 
     asyncio.run(meme_stats.close())
+
+
+def test_init_creates_parent_directory(tmp_path):
+    db_path = tmp_path / "nested" / "stats.db"
+    os.environ["MEME_STATS_DB"] = str(db_path)
+
+    if "memer.meme_stats" in sys.modules:
+        del sys.modules["memer.meme_stats"]
+    meme_stats = importlib.import_module("memer.meme_stats")
+
+    asyncio.run(meme_stats.init())
+
+    assert db_path.parent.exists()
+    assert db_path.exists()
+
+    asyncio.run(meme_stats.close())
