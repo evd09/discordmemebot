@@ -1,6 +1,7 @@
 import random
 import asyncio
 import logging
+import inspect
 from typing import Optional, Callable, Sequence, List, Union, Dict, AsyncIterator, Tuple
 from dataclasses import dataclass
 from cachetools import TTLCache
@@ -288,6 +289,7 @@ async def fetch_meme(
 ) -> MemeResult:
     from memer.helpers.meme_utils import extract_post_data
     extract_fn = extract_fn or extract_post_data
+    is_async_extract = inspect.iscoroutinefunction(extract_fn)
 
     regex = keyword is not None
     exclude_ids_set = set(exclude_ids or [])
@@ -420,7 +422,7 @@ async def fetch_meme(
                 try:
                     async for post in _search_with_retry(sub_obj, keyword, limit):
                         if is_valid_post(post):
-                            data = extract_fn(post)
+                            data = await extract_fn(post) if is_async_extract else extract_fn(post)
                             posts.append((post, data))
                 except Exception:
                     # if search isn't supported or fails, skip to listings
@@ -434,7 +436,7 @@ async def fetch_meme(
                     for sub_name, post_list in posts_by_sub.items():
                         for post in post_list:
                             if is_valid_post(post):
-                                data = extract_fn(post)
+                                data = await extract_fn(post) if is_async_extract else extract_fn(post)
                                 posts.append((post, data))
                     if posts:
                         listing_used = listing_choice
@@ -521,7 +523,7 @@ async def fetch_meme(
                 while buf:
                     post = buf.pop()
                     if post and is_valid_post(post):
-                        data = extract_fn(post)
+                        data = await extract_fn(post) if is_async_extract else extract_fn(post)
                         existing_rand = cache_mgr.get_from_ram(RAND_SENTINEL, nsfw=nsfw) or []
                         if data.get("post_id") not in {p.get("post_id") for p in existing_rand}:
                             existing_rand.append(data)
@@ -548,7 +550,7 @@ async def fetch_meme(
                     if random.randrange(count) == 0:
                         choice_post = post
             if choice_post:
-                data = extract_fn(choice_post)
+                data = await extract_fn(choice_post) if is_async_extract else extract_fn(choice_post)
                 key = f"{name}_{listing_choice}"
                 buf = WARM_CACHE.setdefault(key, deque(maxlen=limit))
                 buf.appendleft(choice_post)
@@ -571,7 +573,7 @@ async def fetch_meme(
     chosen_sub = raw.display_name if hasattr(raw, "display_name") else str(raw)
     post = await simple_random_meme(reddit, chosen_sub)
     if post and is_valid_post(post):
-        data = extract_fn(post)
+        data = await extract_fn(post) if is_async_extract else extract_fn(post)
         existing_rand = cache_mgr.get_from_ram(RAND_SENTINEL, nsfw=nsfw) or []
         if data.get("post_id") not in {p.get("post_id") for p in existing_rand}:
             existing_rand.append(data)

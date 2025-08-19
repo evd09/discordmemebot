@@ -172,7 +172,7 @@ class Meme(commands.Cog):
                         post = buf.pop()
                         if not post:
                             continue
-                        data = extract_post_data(post)
+                        data = await extract_post_data(post)
                         await self._send_cached(ctx, data, keyword or "", "WARM CACHE", nsfw)
                         return True
 
@@ -265,6 +265,12 @@ class Meme(commands.Cog):
             return await ctx.interaction.followup.send(
                 "✅ No fresh memes right now—try again later!", ephemeral=True
             )
+
+        if hasattr(post, "load"):
+            try:
+                await post.load()
+            except Exception:
+                pass
 
         # ─── BUILD EMBED ─────────────────────────────────────
         embed = Embed(
@@ -380,6 +386,12 @@ class Meme(commands.Cog):
                 "✅ No fresh NSFW memes right now—try again later!", ephemeral=True
             )
 
+        if hasattr(post, "load"):
+            try:
+                await post.load()
+            except Exception:
+                pass
+
         # ─── BUILD EMBED ─────────────────────────────────────
         embed = Embed(
             title=post.title,
@@ -490,6 +502,12 @@ class Meme(commands.Cog):
                 return await ctx.send(
                     f"✅ No fresh posts in r/{subreddit} right now—try again later!"
                 )
+
+            if hasattr(post, "load"):
+                try:
+                    await post.load()
+                except Exception:
+                    pass
 
             raw_url = get_image_url(post)
             if raw_url.endswith(('.mp4', '.webm')):
