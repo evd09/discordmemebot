@@ -202,13 +202,15 @@ class Meme(commands.Cog):
         except discord.errors.NotFound:
             pass
 
-        # ─── Pipeline + cache ────────────────────────────────
+        # ─── Recent IDs & pipeline fetch ─────────────────────
+        recent_ids = await get_recent_post_ids(ctx.channel.id, limit=20)
         result = await fetch_meme_util(
             reddit=self.reddit,
             subreddits=get_guild_subreddits(ctx.guild.id, "sfw"),
             cache_mgr=self.cache_service.cache_mgr,
             keyword=keyword,
             nsfw=False,
+            exclude_ids=recent_ids,
         )
         post = getattr(result, "post", None)
 
@@ -233,7 +235,6 @@ class Meme(commands.Cog):
             result.picked_via       = "random"
 
         # ─── Avoid recently sent posts ─────────────────────
-        recent_ids = await get_recent_post_ids(ctx.channel.id, limit=20)
         attempts = 0
         all_subs = get_guild_subreddits(ctx.guild.id, "sfw")
         while post and post.id in recent_ids and attempts < 5:
@@ -316,13 +317,15 @@ class Meme(commands.Cog):
         except discord.errors.NotFound:
             pass
 
-        # ─── Pipeline + cache ────────────────────────────────
+        # ─── Recent IDs & pipeline fetch ─────────────────────
+        recent_ids = await get_recent_post_ids(ctx.channel.id, limit=20)
         result = await fetch_meme_util(
             reddit=self.reddit,
             subreddits=get_guild_subreddits(ctx.guild.id, "nsfw"),
             cache_mgr=self.cache_service.cache_mgr,
             keyword=keyword,
             nsfw=True,
+            exclude_ids=recent_ids,
         )
         post = getattr(result, "post", None)
 
@@ -346,7 +349,6 @@ class Meme(commands.Cog):
             result.picked_via       = "random"
 
         # ─── Avoid recently sent posts ─────────────────────
-        recent_ids = await get_recent_post_ids(ctx.channel.id, limit=20)
         attempts = 0
         all_subs = get_guild_subreddits(ctx.guild.id, "nsfw")
         while post and post.id in recent_ids and attempts < 5:
@@ -426,12 +428,14 @@ class Meme(commands.Cog):
         random_fallback = False
 
         try:
+            recent_ids = await get_recent_post_ids(ctx.channel.id, limit=20)
             result = await fetch_meme_util(
                 reddit=self.reddit,
                 subreddits=[sub],
                 keyword=keyword,
                 cache_mgr=self.cache_service.cache_mgr,
                 nsfw=bool(getattr(sub, "over18", False)),
+                exclude_ids=recent_ids,
             )
             post = getattr(result, "post", None) if result else None
 
@@ -454,7 +458,6 @@ class Meme(commands.Cog):
                 result.source_subreddit = subreddit
                 result.picked_via       = "random"
 
-            recent_ids = await get_recent_post_ids(ctx.channel.id, limit=20)
             attempts = 0
             while post and post.id in recent_ids and attempts < 5:
                 log.debug("🚫 recently sent, trying another post")
