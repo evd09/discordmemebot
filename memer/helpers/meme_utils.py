@@ -78,6 +78,25 @@ def get_image_url(post: Submission) -> str:
         log.debug("Matched .gif directly for post.id=%s", post.id)
         return url
 
+    if getattr(post, "is_gallery", False):
+        try:
+            items = getattr(post, "gallery_data", {}).get("items", [])
+            if items:
+                first_id = items[0].get("media_id")
+                meta = getattr(post, "media_metadata", {}).get(first_id, {})
+                gallery_url = meta.get("s", {}).get("u")
+                if not gallery_url and meta.get("p"):
+                    gallery_url = meta["p"][-1].get("u")
+                if gallery_url:
+                    log.debug(
+                        "Using gallery image %s for post.id=%s",
+                        gallery_url,
+                        post.id,
+                    )
+                    return gallery_url
+        except Exception as e:
+            log.debug("No usable gallery image for post.id=%s: %s", post.id, e)
+
     try:
         variants = post.preview["images"][0].get("variants", {})
         if "gif" in variants:
