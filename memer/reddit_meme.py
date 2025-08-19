@@ -280,20 +280,25 @@ async def fetch_meme(
         if cache_mgr.is_disabled(keyword, nsfw=nsfw):
             return MemeResult(None, None, None, [keyword], ["disabled"], "fallback")
 
-        # (4) Live Reddit fetch across all provided subreddits concurrently
+        # (4) Live Reddit fetch across all provided subreddits
         posts: List[Dict] = []
+        listing_used: Optional[str] = None
         try:
-            # create subreddit objects (concurrently) then fetch listings concurrently
+            # create subreddit objects (concurrently) then iterate through listings
             sub_objs = await asyncio.gather(
                 *(reddit.subreddit(s) for s in subreddits)
             )
-            listing_choice = random.choice(listings)
-            posts_by_sub = await _fetch_concurrent(sub_objs, listing_choice, limit)
-            for sub_name, post_list in posts_by_sub.items():
-                for post in post_list:
-                    if is_valid_post(post):
-                        data = extract_fn(post)
-                        posts.append(data)
+            for listing_choice in listings:
+                posts = []
+                posts_by_sub = await _fetch_concurrent(sub_objs, listing_choice, limit)
+                for sub_name, post_list in posts_by_sub.items():
+                    for post in post_list:
+                        if is_valid_post(post):
+                            data = extract_fn(post)
+                            posts.append(data)
+                if posts:
+                    listing_used = listing_choice
+                    break
         except Exception:
             posts = []
 
@@ -304,7 +309,7 @@ async def fetch_meme(
             return MemeResult(
                 None,
                 chosen.get("subreddit"),
-                "reddit",
+                listing_used,
                 [keyword],
                 [],
                 "live",
