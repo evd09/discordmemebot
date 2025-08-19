@@ -100,14 +100,14 @@ memebot/
 
 ---
 ## Discord Bot Permissions: ##
-| Permission               | Purpose                                  |
-| ------------------------ | ---------------------------------------- |
-| **Send Messages**        | To post memes/replies                    |
-| **Embed Links**          | To send rich embeds (images, video)      |
-| **Use Slash Commands**   | To allow modern slash commands           |
-| **Read Message History** | For user/guild stats                     |
-| **Add Reactions**        | For meme voting                          |
-| **Connect/Speak**        | For voice channel entrance/beep playback |
+| Permission | Purpose |
+| --- | --- |
+| **Send Messages** | To post memes/replies |
+| **Embed Links** | To send rich embeds (images, video) |
+| **Use Slash Commands** | To allow modern slash commands |
+| **Read Message History** | For user/guild stats |
+| **Add Reactions** | For meme voting |
+| **Connect/Speak** | For voice channel entrance/beep playback |
 
 
 ---
@@ -238,7 +238,7 @@ Subreddit management is handled through `/memeadmin` buttons or automatic refres
 
 ## 🛠️ Commands Overview ##
 | Command | Description |
-|:--|:--|
+| --- | --- |
 | /help | List all commands |
 | /ping | Check bot latency |
 | /meme <keyword> | Fetch a SFW meme by keyword or emoji |
@@ -252,7 +252,7 @@ Subreddit management is handled through `/memeadmin` buttons or automatic refres
 
 ### Entrance/Beeps
 | Command | Description |
-|:--|:--|
+| --- | --- |
 | /entrance | **Interactive UI**: Set, preview, remove |
 | /myentrance | Show your entrance file/volume |
 | /beeps | Play a random beep or choose one |
