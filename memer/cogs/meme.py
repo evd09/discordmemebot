@@ -486,8 +486,7 @@ class Meme(commands.Cog):
 
         # ---------------- User Commands ----------------
         user_cmds = [
-            "`/balance` - Check your coin balance",
-            "`/buy <item>` - Purchase a shop item",
+            "`/store` - Check balance or buy items",
             "`/meme [keyword]` - Fetch a SFW meme",
             "`/nsfwmeme [keyword]` - Fetch a NSFW meme",
             "`/r_ <subreddit> [keyword]` - Fetch from a specific subreddit",

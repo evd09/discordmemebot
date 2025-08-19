@@ -248,8 +248,7 @@ Subreddit management is handled through `/memeadmin` buttons or automatic refres
 | /dashboard | Show meme and economy stats & leaderboards |
 | /memeadmin | Admin panel for ping, uptime, subreddit management, etc. |
 | /memeadmin → Toggle Gambling | Button to enable or disable all economy and gambling features |
-| /balance | Check your coin balance |
-| /buy <item> | Purchase a shop item |
+| /store | Open the store to check balance or buy items |
 | /gamble [amount] | Play flip, roll, high-low, slots, crash, blackjack, or the lottery |
 
 ### Entrance/Beeps
