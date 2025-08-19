@@ -37,19 +37,156 @@ class AddSubredditModal(discord.ui.Modal, title="Add Subreddit"):
         )
 
 
-class RemoveSubredditModal(discord.ui.Modal, title="Remove Subreddit"):
-    def __init__(self, cog: "MemeAdmin"):
-        super().__init__()
+class RemoveSubredditView(discord.ui.View):
+    def __init__(self, cog: "MemeAdmin", guild_id: int):
+        super().__init__(timeout=60)
         self.cog = cog
-        self.name = discord.ui.TextInput(label="Subreddit name")
-        self.category = discord.ui.TextInput(label="Category (sfw/nsfw)")
-        self.add_item(self.name)
-        self.add_item(self.category)
+        self.guild_id = guild_id
+        self.category = "sfw"
+        self.subreddits = get_guild_subreddits(guild_id, self.category)
+        self.selected_subreddit = self.subreddits[0] if self.subreddits else None
 
-    async def on_submit(self, interaction: discord.Interaction):
-        await self.cog.handle_removesubreddit(
-            interaction, self.name.value, self.category.value
+        self.page = 0
+        self.page_size = 25
+        self.max_page = (len(self.subreddits) - 1) // self.page_size
+
+        self.add_category_select()
+        self.add_subreddit_select()
+        self.add_pagination()
+
+    def content(self) -> str:
+        base = f"{self.category.upper()} — Page {self.page+1}/{self.max_page+1}"
+        if self.selected_subreddit:
+            return f"Selected `{self.selected_subreddit}` ({base})"
+        return f"Select a subreddit to remove ({base})"
+
+    def add_category_select(self):
+        for child in list(self.children):
+            if isinstance(child, discord.ui.Select) and child.custom_id == "category_select":
+                self.remove_item(child)
+        options = [
+            discord.SelectOption(label="SFW", value="sfw", default=self.category == "sfw"),
+            discord.SelectOption(label="NSFW", value="nsfw", default=self.category == "nsfw"),
+        ]
+        select = discord.ui.Select(
+            placeholder="Select category",
+            options=options,
+            custom_id="category_select",
+            row=0,
         )
+        select.callback = self.on_category_select
+        self.add_item(select)
+
+    def add_subreddit_select(self):
+        for child in list(self.children):
+            if isinstance(child, discord.ui.Select) and child.custom_id == "sub_select":
+                self.remove_item(child)
+        start = self.page * self.page_size
+        end = start + self.page_size
+        current = self.subreddits[start:end]
+        if current:
+            if self.selected_subreddit not in current:
+                self.selected_subreddit = current[0]
+            options = [discord.SelectOption(label=s) for s in current]
+            select = discord.ui.Select(
+                placeholder="Select subreddit",
+                options=options,
+                custom_id="sub_select",
+                row=1,
+            )
+            select.callback = self.on_subreddit_select
+        else:
+            self.selected_subreddit = None
+            select = discord.ui.Select(
+                placeholder="No subreddits",
+                options=[discord.SelectOption(label="None", value="none")],
+                custom_id="sub_select",
+                row=1,
+                disabled=True,
+            )
+        self.add_item(select)
+        self.update_confirm_button()
+
+    def add_pagination(self):
+        for child in list(self.children):
+            if isinstance(child, discord.ui.Button) and getattr(child, "custom_id", None) in (
+                "prev_page",
+                "next_page",
+            ):
+                self.remove_item(child)
+        if self.max_page > 0:
+            prev = discord.ui.Button(
+                label="⬅️ Prev",
+                style=discord.ButtonStyle.secondary,
+                custom_id="prev_page",
+                row=3,
+                disabled=self.page == 0,
+            )
+            prev.callback = self.prev_page
+            self.add_item(prev)
+
+            nextb = discord.ui.Button(
+                label="Next ➡️",
+                style=discord.ButtonStyle.secondary,
+                custom_id="next_page",
+                row=3,
+                disabled=self.page == self.max_page,
+            )
+            nextb.callback = self.next_page
+            self.add_item(nextb)
+
+    def update_confirm_button(self):
+        for child in self.children:
+            if isinstance(child, discord.ui.Button) and getattr(child, "custom_id", None) == "confirm_remove":
+                child.disabled = self.selected_subreddit is None
+
+    async def change_page(self, interaction: discord.Interaction, new_page: int):
+        self.page = new_page
+        self.max_page = (len(self.subreddits) - 1) // self.page_size
+        self.add_subreddit_select()
+        self.add_pagination()
+        await interaction.response.edit_message(content=self.content(), view=self)
+
+    async def on_category_select(self, interaction: discord.Interaction):
+        self.category = interaction.data["values"][0]
+        self.subreddits = get_guild_subreddits(self.guild_id, self.category)
+        self.selected_subreddit = self.subreddits[0] if self.subreddits else None
+        self.page = 0
+        self.max_page = (len(self.subreddits) - 1) // self.page_size
+        self.add_subreddit_select()
+        self.add_pagination()
+        await interaction.response.edit_message(content=self.content(), view=self)
+
+    async def on_subreddit_select(self, interaction: discord.Interaction):
+        self.selected_subreddit = interaction.data["values"][0]
+        self.update_confirm_button()
+        await interaction.response.edit_message(content=self.content(), view=self)
+
+    async def prev_page(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.change_page(interaction, self.page - 1)
+
+    async def next_page(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.change_page(interaction, self.page + 1)
+
+    @discord.ui.button(
+        label="Remove",
+        style=discord.ButtonStyle.danger,
+        custom_id="confirm_remove",
+        row=2,
+    )
+    async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not self.selected_subreddit:
+            await interaction.response.send_message("No subreddit selected.", ephemeral=True)
+            return
+        await self.cog.handle_removesubreddit(
+            interaction, self.selected_subreddit, self.category
+        )
+        for child in self.children:
+            child.disabled = True
+        try:
+            await interaction.edit_original_response(view=self)
+        except Exception:
+            pass
 
 
 class IdleTimeoutModal(discord.ui.Modal, title="Set Idle Timeout"):
@@ -118,7 +255,10 @@ class AdminView(discord.ui.View):
 
     @discord.ui.button(label="Remove Subreddit", style=discord.ButtonStyle.secondary)
     async def remove_subreddit(self, interaction: discord.Interaction, _: discord.ui.Button):
-        await interaction.response.send_modal(RemoveSubredditModal(self.cog))
+        view = RemoveSubredditView(self.cog, interaction.guild.id)
+        await interaction.response.send_message(
+            view.content(), view=view, ephemeral=True
+        )
 
     @discord.ui.button(label="Validate Subreddits", style=discord.ButtonStyle.secondary)
     async def validate_subs(self, interaction: discord.Interaction, _: discord.ui.Button):
