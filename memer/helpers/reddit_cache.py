@@ -196,8 +196,11 @@ class RedditCacheManager:
 
             for (keyword, nsfw), result in zip(keyword_list, results):
                 if isinstance(result, Exception):
-                    print(
-                        f"[Refresh] Failed to refresh {keyword} ({'NSFW' if nsfw else 'SFW'}): {result}"
+                    log.warning(
+                        "[Refresh] Failed to refresh %s (%s): %s",
+                        keyword,
+                        "NSFW" if nsfw else "SFW",
+                        result,
                     )
 
             self.clear_disabled()
