@@ -91,6 +91,10 @@ async def _search_with_retry(
     limit: int,
     retries: int = 3,
     backoff: int = 1,
+    *,
+    sort: str = "new",
+    time_filter: str = "all",
+    **search_kwargs,
 ) -> AsyncIterator[Submission]:
     """Search a subreddit for keyword with retry/backoff."""
     for attempt in range(1, retries + 1):
@@ -104,9 +108,23 @@ async def _search_with_retry(
             )
             await throttle()
             count = 0
-            async for p in subreddit.search(keyword, limit=limit):
-                count += 1
-                yield p
+            try:
+                async for p in subreddit.search(
+                    keyword,
+                    limit=limit,
+                    sort=sort,
+                    time_filter=time_filter,
+                    params={"include_over_18": "on"},
+                    **search_kwargs,
+                ):
+                    count += 1
+                    yield p
+            except TypeError:
+                # Fallback for implementations that don't accept the extra
+                # arguments used above.
+                async for p in subreddit.search(keyword, limit=limit):
+                    count += 1
+                    yield p
             log.debug(
                 "Search fetched %d posts from r/%s for '%s'",
                 count,
