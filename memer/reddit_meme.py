@@ -260,10 +260,20 @@ async def simple_random_meme(reddit: Reddit, subreddit_name: str) -> Optional[Su
         if p and getattr(getattr(p, "subreddit", None), "display_name", "").lower() == want:
             log.debug("simple_random_meme: got %s via .random() on r/%s", p.id, subreddit_name)
             return p
-    except (BadRequest, NotFound, Forbidden) as e:
+    except BadRequest as e:
+        log.debug(
+            "simple_random_meme: .random() bad request for r/%s: %s",
+            subreddit_name,
+            e,
+        )
+    except (NotFound, Forbidden) as e:
         raise SubredditUnavailableError(subreddit_name) from e
     except Exception as e:
-        log.debug("simple_random_meme: .random() failed for r/%s: %s", subreddit_name, e)
+        log.debug(
+            "simple_random_meme: .random() failed for r/%s: %s",
+            subreddit_name,
+            e,
+        )
 
     # 2️⃣ Fallback → .hot()
     try:
