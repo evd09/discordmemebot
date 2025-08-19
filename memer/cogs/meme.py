@@ -477,6 +477,8 @@ class Meme(commands.Cog):
                 attempts += 1
 
             if not post or post.id in recent_ids:
+                if await self._try_cache_or_local(ctx, nsfw=sub.over18, keyword=keyword):
+                    return
                 if ctx.interaction:
                     return await ctx.interaction.followup.send(
                         f"✅ No fresh posts in r/{subreddit} right now—try again later!",
