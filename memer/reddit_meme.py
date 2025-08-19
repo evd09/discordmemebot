@@ -9,6 +9,7 @@ from asyncio import Semaphore
 from collections import deque
 from asyncpraw import Reddit
 from asyncpraw.models import Subreddit, Submission
+from asyncprawcore import NotFound, Forbidden, BadRequest
 from memer.helpers.rate_limit import throttle
 from memer.helpers.reddit_config import CONFIG
 
@@ -30,6 +31,14 @@ class NoMemeFoundError(RedditMemeError):
         super().__init__(f"No meme found. Tried: {tried}. Errors: {errors}")
         self.tried = tried
         self.errors = errors
+
+
+class SubredditUnavailableError(RedditMemeError):
+    "Raised when a subreddit cannot be accessed or returns a 400 error."
+
+    def __init__(self, subreddit: str):
+        super().__init__(f"Subreddit {subreddit} is not available")
+        self.subreddit = subreddit
 
 # --- Data Structures ---
 @dataclass
@@ -236,6 +245,9 @@ async def simple_random_meme(reddit: Reddit, subreddit_name: str) -> Optional[Su
     """
     try:
         sub: Subreddit = await reddit.subreddit(subreddit_name)
+    except (NotFound, Forbidden, BadRequest) as e:
+        log.warning("Could not load r/%s: %s", subreddit_name, e)
+        raise SubredditUnavailableError(subreddit_name) from e
     except Exception as e:
         log.warning("Could not load r/%s: %s", subreddit_name, e)
         return None
@@ -244,10 +256,12 @@ async def simple_random_meme(reddit: Reddit, subreddit_name: str) -> Optional[Su
 
     # 1️⃣ Try the true random endpoint
     try:
-        p = await sub.random()  # this will 400 on most subs
+        p = await sub.random()  # this will 400 on many subs
         if p and getattr(getattr(p, "subreddit", None), "display_name", "").lower() == want:
             log.debug("simple_random_meme: got %s via .random() on r/%s", p.id, subreddit_name)
             return p
+    except (BadRequest, NotFound, Forbidden) as e:
+        raise SubredditUnavailableError(subreddit_name) from e
     except Exception as e:
         log.debug("simple_random_meme: .random() failed for r/%s: %s", subreddit_name, e)
 
@@ -270,6 +284,8 @@ async def simple_random_meme(reddit: Reddit, subreddit_name: str) -> Optional[Su
                 subreddit_name,
             )
             return choice
+    except (BadRequest, NotFound, Forbidden) as e:
+        raise SubredditUnavailableError(subreddit_name) from e
     except Exception as e:
         log.warning(
             "simple_random_meme: .hot() fallback failed for r/%s: %s",

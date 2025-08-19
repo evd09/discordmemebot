@@ -11,7 +11,7 @@ log.setLevel(logging.INFO)
 
 from datetime import datetime
 from typing import Optional
-from asyncprawcore import NotFound
+from asyncprawcore import NotFound, Forbidden
 import asyncpraw
 from memer.helpers.guild_subreddits import (
     get_guild_subreddits,
@@ -43,6 +43,7 @@ from memer.reddit_meme import (
     fetch_meme      as fetch_meme_util,
     simple_random_meme,
     NoMemeFoundError,
+    SubredditUnavailableError,
     start_warmup,
     stop_warmup,
     WARM_CACHE,
@@ -234,7 +235,10 @@ class Meme(commands.Cog):
         if not post:
             all_subs = get_guild_subreddits(ctx.guild.id, "sfw")
             rand_sub = random.choice(all_subs)
-            post = await simple_random_meme(self.reddit, rand_sub)
+            try:
+                post = await simple_random_meme(self.reddit, rand_sub)
+            except SubredditUnavailableError:
+                post = None
             if not post:
                 if await self._try_cache_or_local(ctx, nsfw=False, keyword=keyword):
                     return
@@ -252,7 +256,10 @@ class Meme(commands.Cog):
         all_subs = get_guild_subreddits(ctx.guild.id, "sfw")
         while post and post.id in recent_ids and attempts < 5:
             rand_sub = random.choice(all_subs)
-            post = await simple_random_meme(self.reddit, rand_sub)
+            try:
+                post = await simple_random_meme(self.reddit, rand_sub)
+            except SubredditUnavailableError:
+                post = None
             if not post:
                 attempts += 1
                 continue
@@ -355,7 +362,10 @@ class Meme(commands.Cog):
         if not post:
             all_subs = get_guild_subreddits(ctx.guild.id, "nsfw")
             rand_sub = random.choice(all_subs)
-            post = await simple_random_meme(self.reddit, rand_sub)
+            try:
+                post = await simple_random_meme(self.reddit, rand_sub)
+            except SubredditUnavailableError:
+                post = None
             if not post:
                 if await self._try_cache_or_local(ctx, nsfw=True, keyword=keyword):
                     return
@@ -372,7 +382,10 @@ class Meme(commands.Cog):
         all_subs = get_guild_subreddits(ctx.guild.id, "nsfw")
         while post and post.id in recent_ids and attempts < 5:
             rand_sub = random.choice(all_subs)
-            post = await simple_random_meme(self.reddit, rand_sub)
+            try:
+                post = await simple_random_meme(self.reddit, rand_sub)
+            except SubredditUnavailableError:
+                post = None
             if not post:
                 attempts += 1
                 continue
@@ -445,8 +458,8 @@ class Meme(commands.Cog):
         # 2) Lookup subreddit
         try:
             sub = await self.reddit.subreddit(subreddit, fetch=True)
-        except NotFound:
-            return await ctx.reply(f"❌ Could not find subreddit `{subreddit}`.", ephemeral=True)
+        except (NotFound, Forbidden):
+            return await ctx.reply(f"r/{subreddit} is not available :/", ephemeral=True)
 
         # 3) Fetch via pipeline (or random fallback)
         post = None
@@ -477,7 +490,13 @@ class Meme(commands.Cog):
             # If nothing found, do a true random fallback from that subreddit
             if not post:
                 log.info("No post found via keyword, trying random fallback in r/%s", subreddit)
-                post = await simple_random_meme(self.reddit, subreddit)
+                try:
+                    post = await simple_random_meme(self.reddit, subreddit)
+                except SubredditUnavailableError:
+                    msg = f"r/{subreddit} is not available :/"
+                    if ctx.interaction:
+                        return await ctx.interaction.followup.send(msg, ephemeral=True)
+                    return await ctx.send(msg)
                 if not post:
                     log.info("No random meme found for r/%s, sending fail message.", subreddit)
                     if ctx.interaction:
@@ -496,7 +515,13 @@ class Meme(commands.Cog):
             attempts = 0
             while post and post.id in recent_ids and attempts < 5:
                 log.debug("🚫 recently sent, trying another post")
-                post = await simple_random_meme(self.reddit, subreddit)
+                try:
+                    post = await simple_random_meme(self.reddit, subreddit)
+                except SubredditUnavailableError:
+                    msg = f"r/{subreddit} is not available :/"
+                    if ctx.interaction:
+                        return await ctx.interaction.followup.send(msg, ephemeral=True)
+                    return await ctx.send(msg)
                 if post:
                     result.source_subreddit = subreddit
                     result.picked_via = "random"
