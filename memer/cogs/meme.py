@@ -172,6 +172,7 @@ class Meme(commands.Cog):
             rand_sub = random.choice(all_subs)
             post = await simple_random_meme(self.reddit, rand_sub)
             if not post:
+                ctx._no_reward = True
                 return await ctx.interaction.followup.send(
                     "✅ No memes found—try again later!", ephemeral=True
                 )
@@ -194,6 +195,7 @@ class Meme(commands.Cog):
             result.picked_via = "random"
             attempts += 1
         if not post or post.id in recent_ids:
+            ctx._no_reward = True
             return await ctx.interaction.followup.send(
                 "✅ No fresh memes right now—try again later!", ephemeral=True
             )
@@ -223,6 +225,7 @@ class Meme(commands.Cog):
             log.info("✅ send_meme succeeded message_id=%s", sent.id)
         except Exception:
             log.exception("Error in send_meme")
+            ctx._no_reward = True
             return await ctx.interaction.followup.send(
                 "❌ Error sending meme.", ephemeral=True
             )
@@ -248,6 +251,7 @@ class Meme(commands.Cog):
 
         # ─── NSFW channel check ───────────────────────────────
         if not ctx.channel.is_nsfw():
+            ctx._no_reward = True
             return await ctx.interaction.response.send_message(
                 "🔞 You can only use NSFW memes in NSFW channels.",
                 ephemeral=True
@@ -299,6 +303,7 @@ class Meme(commands.Cog):
             result.picked_via = "random"
             attempts += 1
         if not post or post.id in recent_ids:
+            ctx._no_reward = True
             return await ctx.interaction.followup.send(
                 "✅ No fresh NSFW memes right now—try again later!", ephemeral=True
             )
@@ -328,6 +333,7 @@ class Meme(commands.Cog):
             log.info("✅ NSFW send_meme succeeded message_id=%s", sent.id)
         except Exception:
             log.exception("Error in send_meme")
+            ctx._no_reward = True
             return await ctx.interaction.followup.send(
                 "❌ Error sending NSFW meme.", ephemeral=True
             )
