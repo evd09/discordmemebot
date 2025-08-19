@@ -180,6 +180,24 @@ class Meme(commands.Cog):
             result.source_subreddit = rand_sub
             result.picked_via       = "random"
 
+        # ─── Avoid recently sent posts ─────────────────────
+        recent_ids = await get_recent_post_ids(ctx.channel.id, limit=20)
+        attempts = 0
+        all_subs = get_guild_subreddits(ctx.guild.id, "sfw")
+        while post and post.id in recent_ids and attempts < 5:
+            rand_sub = random.choice(all_subs)
+            post = await simple_random_meme(self.reddit, rand_sub)
+            if not post:
+                attempts += 1
+                continue
+            result.source_subreddit = rand_sub
+            result.picked_via = "random"
+            attempts += 1
+        if not post or post.id in recent_ids:
+            return await ctx.interaction.followup.send(
+                "✅ No fresh memes right now—try again later!", ephemeral=True
+            )
+
         # ─── BUILD EMBED ─────────────────────────────────────
         embed = Embed(
             title=post.title,
@@ -266,6 +284,24 @@ class Meme(commands.Cog):
             result = type("F", (), {})()
             result.source_subreddit = rand_sub
             result.picked_via       = "random"
+
+        # ─── Avoid recently sent posts ─────────────────────
+        recent_ids = await get_recent_post_ids(ctx.channel.id, limit=20)
+        attempts = 0
+        all_subs = get_guild_subreddits(ctx.guild.id, "nsfw")
+        while post and post.id in recent_ids and attempts < 5:
+            rand_sub = random.choice(all_subs)
+            post = await simple_random_meme(self.reddit, rand_sub)
+            if not post:
+                attempts += 1
+                continue
+            result.source_subreddit = rand_sub
+            result.picked_via = "random"
+            attempts += 1
+        if not post or post.id in recent_ids:
+            return await ctx.interaction.followup.send(
+                "✅ No fresh NSFW memes right now—try again later!", ephemeral=True
+            )
 
         # ─── BUILD EMBED ─────────────────────────────────────
         embed = Embed(
@@ -355,11 +391,16 @@ class Meme(commands.Cog):
                 result.picked_via       = "random"
 
             recent_ids = await get_recent_post_ids(ctx.channel.id, limit=20)
-            if post and post.id in recent_ids:
-                log.debug("🚫 recently sent, forcing fallback")
-                post = None
+            attempts = 0
+            while post and post.id in recent_ids and attempts < 5:
+                log.debug("🚫 recently sent, trying another post")
+                post = await simple_random_meme(self.reddit, subreddit)
+                if post:
+                    result.source_subreddit = subreddit
+                    result.picked_via = "random"
+                attempts += 1
 
-            if not post:
+            if not post or post.id in recent_ids:
                 if ctx.interaction:
                     return await ctx.interaction.followup.send(
                         f"✅ No fresh posts in r/{subreddit} right now—try again later!",
