@@ -7,6 +7,9 @@ from .meme_utils import extract_post_data
 from memer.helpers.guild_subreddits import DEFAULTS as SUB_DEFAULTS
 import yaml
 import os
+import logging
+
+log = logging.getLogger(__name__)
 
 CONFIG_PATH = "config/cache.yml"
 DEFAULTS = {
@@ -20,10 +23,13 @@ def load_config():
     if os.path.exists(CONFIG_PATH):
         with open(CONFIG_PATH, "r") as f:
             try:
-                return {**DEFAULTS, **yaml.safe_load(f)}
+                cfg = {**DEFAULTS, **yaml.safe_load(f)}
+                log.info(f"Loaded cache config from {CONFIG_PATH}")
+                return cfg
             except Exception as e:
-                print(f"Failed to load {CONFIG_PATH}: {e}")
+                log.error(f"Failed to load {CONFIG_PATH}: {e}")
                 return DEFAULTS
+    log.info(f"No cache config found at {CONFIG_PATH}, using defaults")
     return DEFAULTS
 
 CONFIG = load_config()
@@ -54,6 +60,7 @@ class MemeCacheService:
         self.cache_refresh_loop.start()
         self.disk_flush_loop.start()
         self._started = True
+        log.info("MemeCacheService initialized")
 
     async def close(self):
         if not self._started:
@@ -62,6 +69,7 @@ class MemeCacheService:
         self.disk_flush_loop.cancel()
         await self.cache_mgr.close()
         self._started = False
+        log.info("MemeCacheService closed")
 
     async def get_cache_info(self) -> str:
         ram_sfw_kw = [k for k, nsfw in self.cache_mgr.ram_cache.keys() if not nsfw]
@@ -104,7 +112,7 @@ class MemeCacheService:
                             sub_results.append(extract_post_data(post))
                     return sub_results
                 except Exception as e:
-                    print(f"Error fetching {sub_name} for keyword {keyword}: {e}")
+                    log.error(f"Error fetching {sub_name} for keyword {keyword}: {e}")
                     return []
 
         results = await asyncio.gather(*(fetch_sub(name) for name in subs))
@@ -120,4 +128,4 @@ class MemeCacheService:
     @tasks.loop(seconds=3600)
     async def disk_flush_loop(self):
         await self.cache_mgr.flush_expired_disk(ttl_seconds=CONFIG["disk_cache_ttl"])
-        print("[Disk Flush] Expired disk entries cleaned up.")
+        log.info("[Disk Flush] Expired disk entries cleaned up.")
