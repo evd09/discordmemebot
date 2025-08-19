@@ -944,7 +944,7 @@ class Gamble(commands.Cog):
             else:
                 await channel.send(f"🎉 We have a winner, but couldn't find their user ID: `{winner['user_id']}`.")
         else:
-            print("No channel found to announce the lottery winner.")
+            log.warning("No channel found to announce the lottery winner.")
 
         # Optionally DM the user
         if user:
