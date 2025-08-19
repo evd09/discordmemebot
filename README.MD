@@ -237,24 +237,25 @@ Subreddit management is handled through `/memeadmin` buttons or automatic refres
 - Respect NSFW channel restrictions as per Discord guidelines.
 
 ## 🛠️ Commands Overview ##
-| Command                   | Description                                                                 |
-|:--------------------------|:---------------------------------------------------------------------------|
-| /help                     | List all commands                                                          |
-| /meme <keyword>           | Fetch a SFW meme by keyword or emoji                                       |
-| /nsfwmeme <keyword>       | Fetch a NSFW meme (NSFW channel required)                                  |
-| /r_ <subreddit> [keyword] | Fetch meme from a specific subreddit, optionally filtered by keyword       |
-| /dashboard                | Show meme and economy stats & leaderboards                                 |
-| /memeadmin                | Admin panel for ping, uptime, subreddit management, etc.                   |
-| /balance                  | Check your coin balance                                                    |
-| /buy <item>               | Purchase a shop item                                                       |
-| /gamble [amount]          | Play flip, roll, high-low, slots, crash, blackjack, or the lottery         |
+| Command | Description |
+|:--|:--|
+| /help | List all commands |
+| /ping | Check bot latency |
+| /meme <keyword> | Fetch a SFW meme by keyword or emoji |
+| /nsfwmeme <keyword> | Fetch a NSFW meme (NSFW channel required) |
+| /r_ <subreddit> [keyword] | Fetch meme from a specific subreddit, optionally filtered by keyword |
+| /dashboard | Show meme and economy stats & leaderboards |
+| /memeadmin | Admin panel for ping, uptime, subreddit management, etc. |
+| /balance | Check your coin balance |
+| /buy <item> | Purchase a shop item |
+| /gamble [amount] | Play flip, roll, high-low, slots, crash, blackjack, or the lottery |
 
 ### Entrance/Beeps
-| Command       | Description                             |
-|---------------|-----------------------------------------|
-| /entrance     | **Interactive UI**: Set, preview, remove|
-| /myentrance   | Show your entrance file/volume          |
-| /beeps        | Play a random beep or choose one        |
+| Command | Description |
+|:--|:--|
+| /entrance | **Interactive UI**: Set, preview, remove |
+| /myentrance | Show your entrance file/volume |
+| /beeps | Play a random beep or choose one |
 
 
 ## 🎉 Contributing & Testing ##
