@@ -121,7 +121,7 @@ async def cleanup_all_voice(bot):
 
 
 async def sync_app_commands(bot: commands.Bot) -> None:
-    """Sync application commands globally and to the dev guild (if configured)."""
+    """Sync application commands to the dev guild (if configured)."""
 
     # Diagnostic
     cmds = bot.tree.get_commands()
@@ -141,24 +141,18 @@ async def sync_app_commands(bot: commands.Bot) -> None:
         bot.tree.clear_commands(guild=guild_obj)
         bot.tree.copy_global_to(guild=guild_obj)
 
-    log.info("🔄 Syncing slash commands…")
+    if not DEV_GUILD_ID:
+        log.info("No DEV_GUILD_ID provided; skipping dev guild sync")
+        return
+
+    log.info("🔄 Syncing slash commands to dev guild…")
     try:
-        if DEV_GUILD_ID:
-            synced = await bot.tree.sync(guild=guild_obj)
-            log.info(
-                "✅ Synced %d commands to dev guild %s!", len(synced), DEV_GUILD_ID
-            )
-            synced = await bot.tree.sync()
-            log.info("✅ Synced %d commands globally!", len(synced))
-        else:
-            synced = await bot.tree.sync()
-            log.info("✅ Synced %d commands globally!", len(synced))
+        synced = await bot.tree.sync(guild=guild_obj)
+        log.info("✅ Synced %d commands to dev guild %s!", len(synced), DEV_GUILD_ID)
     except Forbidden:
-        log.warning("Dev‑guild sync forbidden; falling back to global…")
-        synced = await bot.tree.sync()
-        log.info("✅ Synced %d commands globally!", len(synced))
+        log.warning("Dev‑guild sync forbidden; continuing with global sync later…")
     except Exception:
-        log.error("❌ Failed to sync slash commands", exc_info=True)
+        log.error("❌ Failed to sync dev guild commands", exc_info=True)
 
     # Fetch global commands after syncing to ensure deprecated commands were removed
     try:
@@ -205,7 +199,17 @@ async def on_ready() -> None:
     log.info("Bot is in guilds: %s", [g.id for g in bot.guilds])
     log.info("DEV_GUILD_ID = %s", DEV_GUILD_ID)
 
+    # First sync commands to the dev guild (if configured)
     await sync_app_commands(bot)
+
+    # Remove any legacy commands before syncing globally
+    bot.tree.remove_command("ping")
+
+    try:
+        synced = await bot.tree.sync()
+        log.info("✅ Synced %d commands globally!", len(synced))
+    except Exception:
+        log.error("❌ Failed to globally sync slash commands", exc_info=True)
 
 
 async def main() -> None:
