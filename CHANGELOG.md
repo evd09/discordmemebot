@@ -1,5 +1,10 @@
 # Changelog
 
+# Version 5.0 #
+
+- Removed standalone `/ping` and `/uptime` commands; their functionality now lives in the `/memeadmin` interface.
+- After upgrading, resync your global commands so the changes take effect.
+
 # Version 4.0 #
 Voice & Audio Features in MemeBot
 
