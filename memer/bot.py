@@ -14,6 +14,7 @@ except UnicodeDecodeError:  # pragma: no cover - exercised in integration tests
     load_dotenv(encoding="latin-1")
 
 DEV_GUILD_ID = int(os.getenv("DEV_GUILD_ID", "0"))  # Sync commands per Guild ID
+DISABLE_GLOBAL_COMMANDS = os.getenv("DISABLE_GLOBAL_COMMANDS", "0") == "1"
 
 import asyncio
 import pathlib
@@ -69,7 +70,8 @@ bot.config = SimpleNamespace(
     BASE_REWARD=BASE_REWARD,
     KEYWORD_BONUS=KEYWORD_BONUS,
     DAILY_BONUS=DAILY_BONUS,
-    MEME_CACHE=MEME_CACHE_CONFIG
+    MEME_CACHE=MEME_CACHE_CONFIG,
+    DISABLE_GLOBAL_COMMANDS=DISABLE_GLOBAL_COMMANDS,
 )
 # Configure root logger: send to stdout, show INFO+ by default
 logging.basicConfig(
@@ -154,10 +156,18 @@ async def sync_app_commands(bot: commands.Bot) -> None:
 
     guild_obj = None
     if DEV_GUILD_ID:
-        log.info("Copying global commands into dev guild %s…", DEV_GUILD_ID)
         guild_obj = discord.Object(id=DEV_GUILD_ID)
         bot.tree.clear_commands(guild=guild_obj)
-        bot.tree.copy_global_to(guild=guild_obj)
+        if DISABLE_GLOBAL_COMMANDS:
+            log.info(
+                "Copying commands into dev guild %s; global commands disabled", DEV_GUILD_ID
+            )
+            bot.tree.copy_global_to(guild=guild_obj)
+        else:
+            log.info(
+                "Skipping copy_global_to for dev guild %s; using global commands",
+                DEV_GUILD_ID,
+            )
 
     if not DEV_GUILD_ID:
         log.info("No DEV_GUILD_ID provided; skipping dev guild sync")
@@ -175,7 +185,27 @@ async def sync_app_commands(bot: commands.Bot) -> None:
     # Fetch global commands after syncing to ensure deprecated commands were removed
     try:
         global_cmds = await bot.tree.fetch_commands()
-        global_names = {cmd.name for cmd in global_cmds}
+        seen_names = {}
+        seen_ids = set()
+        for cmd in global_cmds:
+            if cmd.id in seen_ids or (
+                cmd.name in seen_names and seen_names[cmd.name] != cmd.id
+            ):
+                try:
+                    await bot.http.delete_global_command(bot.application_id, cmd.id)
+                    log.info("🗑️ Removed duplicate global command %s (%s)", cmd.name, cmd.id)
+                except Exception:
+                    log.error(
+                        "Failed to delete duplicate global command %s (%s)",
+                        cmd.name,
+                        cmd.id,
+                        exc_info=True,
+                    )
+                continue
+            seen_ids.add(cmd.id)
+            seen_names[cmd.name] = cmd.id
+
+        global_names = set(seen_names)
         expected_names = {cmd.name for cmd in cmds}
         log.info("🌐 Commands currently registered globally: %s", sorted(global_names))
         leftover = global_names - expected_names
