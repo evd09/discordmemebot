@@ -7,7 +7,7 @@ from discord.ext import commands
 from discord import app_commands
 from .audio_player import play_clip  # does NOT manage cooldowns/locks
 from .audio_queue import queue_audio  # all logic for cooldown/locks/4006 is here
-from .constants import SOUND_FOLDER
+from .constants import SOUND_FOLDER, AUDIO_EXTS
 from memer.utils.logger_setup import setup_logger
 
 logger = setup_logger("beep", "beep.log")
@@ -21,7 +21,7 @@ def load_beeps() -> list[str]:
     global beep_cache
     beep_cache = [
         f for f in os.listdir(SOUND_FOLDER)
-        if f.endswith((".mp3", ".wav", ".ogg"))
+        if f.lower().endswith(AUDIO_EXTS)
     ]
     return beep_cache
 

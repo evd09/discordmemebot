@@ -9,7 +9,7 @@ import discord
 from discord import opus
 
 from memer.utils.logger_setup import setup_logger
-from .constants import SOUND_FOLDER
+from .constants import SOUND_FOLDER, AUDIO_EXTS
 
 logger = setup_logger("audio", "audio.log")
 
@@ -24,7 +24,6 @@ if not opus.is_loaded():
     else:
         logger.error("[OPUS] Could not load libopus — voice will NOT work.")
 
-AUDIO_EXTS = (".mp3", ".wav", ".ogg", ".mp4", ".webm")
 
 class AudioCache:
     def __init__(self, max_size: int = 100):
