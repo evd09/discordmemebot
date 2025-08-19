@@ -69,7 +69,10 @@ class Economy(commands.Cog):
         if parts:
             # ephemeral only works on slash; hybrid will fall back to normal reply
             if ctx.interaction:
-                await ctx.reply("\n".join(parts), ephemeral=True)
+                try:
+                    await ctx.interaction.followup.send("\n".join(parts), ephemeral=True)
+                except discord.errors.NotFound:
+                    await ctx.reply("\n".join(parts))
             else:
                 await ctx.reply("\n".join(parts))
 
