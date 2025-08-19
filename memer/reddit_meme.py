@@ -130,10 +130,21 @@ async def start_warmup(
         log.debug("Warmup already running, skipping start_warmup call")
         return
     log.info("Starting warmup task for %d subreddits every %ds", len(subreddits), interval)
-    subs: List[Subreddit] = []
-    for sub in subreddits:
-        name = sub.display_name if isinstance(sub, Subreddit) else sub
-        subs.append(reddit.subreddit(name))  # lazy Subreddit obj
+    # Ensure we create actual Subreddit objects instead of un-awaited
+    # coroutines. asyncpraw's ``reddit.subreddit`` returns a coroutine
+    # (via ``SubredditHelper.__call__``) that must be awaited to produce
+    # the ``Subreddit`` instance. The previous implementation stored the
+    # coroutine objects directly in ``subs`` which triggered
+    # ``RuntimeWarning: coroutine 'SubredditHelper.__call__' was never
+    # awaited`` at runtime.  Gather all Subreddit objects up front so the
+    # warmup loop works with real instances.
+    names = [
+        sub.display_name if isinstance(sub, Subreddit) else sub
+        for sub in subreddits
+    ]
+    subs: List[Subreddit] = await asyncio.gather(
+        *(reddit.subreddit(name) for name in names)
+    )
     async def _loop():
         while True:
             tasks = [_fetch_concurrent(subs, listing, limit) for listing in listings]
