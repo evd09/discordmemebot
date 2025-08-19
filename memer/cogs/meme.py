@@ -341,9 +341,13 @@ class Meme(commands.Cog):
                 post = await simple_random_meme(self.reddit, subreddit)
                 if not post:
                     log.info("No random meme found for r/%s, sending fail message.", subreddit)
-                    return await ctx.followup.send(
-                        f"✅ No memes found in r/{subreddit} right now—try again later!",
-                        ephemeral=True
+                    if ctx.interaction:
+                        return await ctx.interaction.followup.send(
+                            f"✅ No memes found in r/{subreddit} right now—try again later!",
+                            ephemeral=True
+                        )
+                    return await ctx.send(
+                        f"✅ No memes found in r/{subreddit} right now—try again later!"
                     )
                 # Build a result-like object for footer display
                 result = type("F", (), {})()
@@ -356,9 +360,13 @@ class Meme(commands.Cog):
                 post = None
 
             if not post:
-                return await ctx.followup.send(
-                    f"✅ No fresh posts in r/{subreddit} right now—try again later!",
-                    ephemeral=True
+                if ctx.interaction:
+                    return await ctx.interaction.followup.send(
+                        f"✅ No fresh posts in r/{subreddit} right now—try again later!",
+                        ephemeral=True
+                    )
+                return await ctx.send(
+                    f"✅ No fresh posts in r/{subreddit} right now—try again later!"
                 )
 
             raw_url = get_image_url(post)
@@ -396,7 +404,12 @@ class Meme(commands.Cog):
             await update_stats(ctx.author.id, keyword or "", result.source_subreddit, nsfw=False)
         except Exception as e:
             log.error(f"Error in /r_ command: {e}", exc_info=True)
-            await ctx.followup.send("❌ Error fetching meme from subreddit.", ephemeral=True)
+            if ctx.interaction:
+                await ctx.interaction.followup.send(
+                    "❌ Error fetching meme from subreddit.", ephemeral=True
+                )
+            else:
+                await ctx.send("❌ Error fetching meme from subreddit.")
 
     @commands.hybrid_command(name="dashboard", description="Show a stats dashboard")
     async def dashboard(self, ctx):
