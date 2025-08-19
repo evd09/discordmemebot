@@ -326,8 +326,10 @@ class CrashView(View):
             ephemeral=True
         )
 
-    async def on_error(self, error: Exception, item, interaction: Interaction):
-        log.error("CrashView error for %s: %s", interaction.user.id, error, exc_info=True)
+    async def on_error(self, interaction: Interaction, error: Exception, item):
+        log.error(
+            "CrashView error for %s: %s", interaction.user.id, error, exc_info=error
+        )
         if not interaction.response.is_done():
             await interaction.response.send_message(
                 "❌ Something went wrong in the crash game.",
