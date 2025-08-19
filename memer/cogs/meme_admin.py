@@ -4,6 +4,7 @@ from typing import Optional
 from pathlib import Path
 import subprocess
 import logging
+import asyncio
 
 import discord
 from discord.ext import commands
@@ -604,22 +605,36 @@ class MemeAdmin(commands.Cog):
                 if file.suffix.lower() == ".mp3":
                     tmp_file = file.with_suffix(".tmp.mp3")
                     try:
-                        subprocess.run(
-                            ["ffmpeg", "-y", "-i", str(file), "-c", "copy", str(tmp_file)],
-                            check=True,
-                            stdout=subprocess.DEVNULL,
-                            stderr=subprocess.DEVNULL,
+                        proc = await asyncio.create_subprocess_exec(
+                            "ffmpeg",
+                            "-y",
+                            "-i",
+                            str(file),
+                            "-c",
+                            "copy",
+                            str(tmp_file),
+                            stdout=asyncio.subprocess.DEVNULL,
+                            stderr=asyncio.subprocess.DEVNULL,
                         )
+                        returncode = await proc.wait()
+                        if returncode != 0:
+                            raise subprocess.CalledProcessError(returncode, proc.args)
                         tmp_file.replace(file)
                     except subprocess.CalledProcessError:
                         ogg_file = file.with_suffix(".ogg")
                         try:
-                            subprocess.run(
-                                ["ffmpeg", "-y", "-i", str(file), str(ogg_file)],
-                                check=True,
-                                stdout=subprocess.DEVNULL,
-                                stderr=subprocess.DEVNULL,
+                            proc = await asyncio.create_subprocess_exec(
+                                "ffmpeg",
+                                "-y",
+                                "-i",
+                                str(file),
+                                str(ogg_file),
+                                stdout=asyncio.subprocess.DEVNULL,
+                                stderr=asyncio.subprocess.DEVNULL,
                             )
+                            returncode = await proc.wait()
+                            if returncode != 0:
+                                raise subprocess.CalledProcessError(returncode, proc.args)
                             file.unlink()
                         except subprocess.CalledProcessError:
                             if ogg_file.exists():
