@@ -80,6 +80,9 @@ class Meme(commands.Cog):
         self._prune_cache.start()
         # Kick off warmup immediately
         subs = DEFAULTS["sfw"] + DEFAULTS["nsfw"]
+        for mandatory in ("memes", "nsfwmeme"):
+            if mandatory not in subs:
+                subs.append(mandatory)
         log.debug("Scheduling warmup for subs: %s", subs)
         asyncio.create_task(start_warmup(self.reddit, subs))
         start_observer()
