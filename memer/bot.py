@@ -2,7 +2,17 @@
 import os
 from dotenv import load_dotenv
 
-load_dotenv()
+# Load environment variables without crashing on encoding issues.
+# Some environments may provide a `.env` file saved with a non UTF-8
+# encoding (e.g. Windows-1252).  `load_dotenv` assumes UTF-8 by default and
+# raises a ``UnicodeDecodeError`` in that case, preventing the bot from
+# starting.  Attempt to load using UTF-8 first and fall back to a more
+# permissive single-byte encoding to keep startup functional.
+try:  # pragma: no cover - exercised in integration tests
+    load_dotenv()
+except UnicodeDecodeError:  # pragma: no cover - exercised in integration tests
+    load_dotenv(encoding="latin-1")
+
 DEV_GUILD_ID = int(os.getenv("DEV_GUILD_ID", "0"))  # Sync commands per Guild ID
 
 import asyncio
