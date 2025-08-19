@@ -86,14 +86,14 @@ def get_image_url(post: Submission) -> str:
         log.warning("No valid image for post.id=%s – falling back to post.url: %s", post.id, e)
         return url
 
-def get_rxddit_url(url: str) -> str:
-    """Return a URL suitable for Discord embeds.
+def get_reddit_url(url: str) -> str:
+    """Return the original Reddit URL suitable for Discord embeds.
 
-    Previously this function proxied Reddit media through `rxddit.com`,
-    which prevented Discord from displaying the images or videos. The
-    proxying is removed so the original Reddit URL is used directly.
+    This function used to proxy Reddit media through ``rxddit.com``, which
+    prevented Discord from displaying images or videos. The proxying has been
+    removed so the original Reddit URL is used directly.
     """
-    log.debug("get_rxddit_url input=%s", url)
+    log.debug("get_reddit_url input=%s", url)
     return url
 
 def extract_post_data(post):

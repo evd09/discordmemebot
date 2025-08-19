@@ -32,7 +32,7 @@ from discord.ext import commands, tasks
 from memer.helpers.meme_utils import (
     get_image_url,
     send_meme,
-    get_rxddit_url,
+    get_reddit_url,
     extract_post_data,
 )
 from memer.helpers.meme_cache_service import MemeCacheService
@@ -127,7 +127,7 @@ class Meme(commands.Cog):
 
         # 2️⃣ Resolve URLs
         raw_url   = post_dict.get("media_url") or post_dict.get("url")
-        embed_url = get_rxddit_url(raw_url)
+        embed_url = get_reddit_url(raw_url)
 
         # 3️⃣ Send
         sent = await send_meme(ctx, url=embed_url, embed=embed)
@@ -263,7 +263,7 @@ class Meme(commands.Cog):
         embed.set_footer(text=f"via {result.picked_via.upper()}")
 
         raw_url   = get_image_url(post)
-        embed_url = get_rxddit_url(raw_url)
+        embed_url = get_reddit_url(raw_url)
 
         # only apologize if they asked for keyword but got no hits
         content = None
@@ -377,7 +377,7 @@ class Meme(commands.Cog):
         embed.set_footer(text=f"via {result.picked_via.upper()}")
 
         raw_url   = get_image_url(post)
-        embed_url = get_rxddit_url(raw_url)
+        embed_url = get_reddit_url(raw_url)
 
         # only apologize if they asked for keyword but got no hits
         content = None
@@ -479,7 +479,7 @@ class Meme(commands.Cog):
 
             raw_url = get_image_url(post)
             if raw_url.endswith(('.mp4', '.webm')):
-                embed_url = get_rxddit_url(raw_url)  # use proxy for videos
+                embed_url = get_reddit_url(raw_url)  # use original URL for videos
             else:
                 embed_url = raw_url  # original for images
 
