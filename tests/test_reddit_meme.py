@@ -33,17 +33,17 @@ class DummyCache:
 
 
 class FakePost:
-    def __init__(self, title):
+    def __init__(self, title, subreddit="testsub"):
         self.title = title
         self.url = "http://example.com/img.jpg"
         self.id = "xyz"
-        self.subreddit = SimpleNamespace(display_name="testsub")
+        self.subreddit = SimpleNamespace(display_name=subreddit)
 
 
 class FakeSubreddit:
-    def __init__(self, posts):
+    def __init__(self, name, posts):
         self.posts = posts
-        self.display_name = "testsub"
+        self.display_name = name
 
     async def hot(self, limit):
         for p in self.posts:
@@ -56,10 +56,16 @@ class FakeSubreddit:
 
 class FakeReddit:
     def __init__(self, posts):
+        """
+        posts can be either a list (same posts for all subs) or a dict mapping
+        subreddit names to their specific posts.
+        """
         self.posts = posts
 
     async def subreddit(self, name):
-        return FakeSubreddit(self.posts)
+        if isinstance(self.posts, dict):
+            return FakeSubreddit(name, self.posts[name])
+        return FakeSubreddit(name, self.posts)
 
 def test_keyword_filter_accepts_only_matching_posts():
     random.seed(0)
@@ -129,4 +135,32 @@ def test_fetch_meme_supports_top_listing():
         )
     )
 
-    assert result.listing == "top"
+    assert result.listing == "best"
+
+
+def test_keyword_search_across_multiple_subreddits():
+    random.seed(0)
+    post_map = {
+        "sub1": [FakePost("cat in sub1", subreddit="sub1"), FakePost("doggo", subreddit="sub1")],
+        "sub2": [FakePost("another cat here", subreddit="sub2"), FakePost("bird", subreddit="sub2")],
+    }
+    reddit = FakeReddit(post_map)
+    cache = DummyCache()
+
+    result = asyncio.run(
+        fetch_meme(
+            reddit,
+            ["sub1", "sub2"],
+            cache,
+            keyword="cat",
+            listings=("hot",),
+            limit=10,
+            extract_fn=lambda p: {"title": p.title, "media_url": "url", "subreddit": p.subreddit.display_name},
+        )
+    )
+
+    assert cache.cached is not None
+    titles = {p["title"] for p in cache.cached}
+    assert titles == {"cat in sub1", "another cat here"}
+    assert result.errors == []
+    assert result.source_subreddit in {"sub1", "sub2"}

@@ -251,29 +251,27 @@ async def fetch_meme(
         if cache_mgr.is_disabled(keyword, nsfw=nsfw):
             return MemeResult(None, None, None, [keyword], ["disabled"], "fallback")
 
-        # (4) Live Reddit fetch from a single randomly-chosen subreddit
-        posts = []
-        chosen = None
-        count = 0
-        # pick exactly one sub per invocation
-        sub_to_try = random.choice(subreddits)
+        # (4) Live Reddit fetch across all provided subreddits concurrently
+        posts: List[Dict] = []
         try:
-            s_obj = await reddit.subreddit(sub_to_try)
+            # create subreddit objects (concurrently) then fetch listings concurrently
+            sub_objs = await asyncio.gather(
+                *(reddit.subreddit(s) for s in subreddits)
+            )
             listing_choice = random.choice(listings)
-            async for post in _fetch_listing_with_retry(s_obj, listing_choice, limit):
-                if is_valid_post(post):
-                    data = extract_fn(post)
-                    posts.append(data)
-                    count += 1
-                    if random.randrange(count) == 0:
-                        chosen = data
+            posts_by_sub = await _fetch_concurrent(sub_objs, listing_choice, limit)
+            for sub_name, post_list in posts_by_sub.items():
+                for post in post_list:
+                    if is_valid_post(post):
+                        data = extract_fn(post)
+                        posts.append(data)
         except Exception:
             posts = []
 
         if posts:
             cache_mgr.cache_to_ram(keyword, posts, nsfw=nsfw)
             await cache_mgr.save_to_disk(keyword, posts, nsfw=nsfw)
-            chosen = chosen or random.choice(posts)
+            chosen = random.choice(posts)
             return MemeResult(
                 None,
                 chosen.get("subreddit"),
