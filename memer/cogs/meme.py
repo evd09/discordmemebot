@@ -3,6 +3,7 @@ import os
 import random
 import asyncio
 import logging
+import json
 
 # 🔐 Define the logger IMMEDIATELY after importing it
 log = logging.getLogger(__name__)
@@ -28,7 +29,12 @@ from collections import defaultdict, deque
 import discord
 from discord import Embed
 from discord.ext import commands, tasks
-from memer.helpers.meme_utils import get_image_url, send_meme, get_rxddit_url
+from memer.helpers.meme_utils import (
+    get_image_url,
+    send_meme,
+    get_rxddit_url,
+    extract_post_data,
+)
 from memer.helpers.meme_cache_service import MemeCacheService
 from memer.helpers.db import get_recent_post_ids, register_meme_message
 # Refactored utilities and cache
@@ -97,11 +103,13 @@ class Meme(commands.Cog):
         ctx: commands.Context,
         post_dict: dict,
         keyword: str,
-        via: str
+        via: str,
+        nsfw: bool,
     ):
         """
         Send a single cached meme (post_dict) and update stats.
-        via is one of "RAM" or "DISK".
+        ``via`` documents where the meme came from (e.g. ``RAM``, ``DISK``,
+        ``WARM CACHE`` or ``LOCAL``).
         """
         # figure out a permalink
         permalink = post_dict.get("permalink")
@@ -132,7 +140,48 @@ class Meme(commands.Cog):
             f"https://reddit.com{permalink}",
             post_dict["title"]
         )
-        await update_stats(ctx.author.id, keyword or "", post_dict["subreddit"], nsfw=False)
+        await update_stats(ctx.author.id, keyword or "", post_dict["subreddit"], nsfw=nsfw)
+
+    async def _try_cache_or_local(self, ctx, nsfw: bool, keyword: Optional[str]) -> bool:
+        """Attempt to send a meme from warm cache or local fallback files.
+
+        Returns True if a meme was sent, False otherwise.
+        """
+        subs = get_guild_subreddits(ctx.guild.id, "nsfw" if nsfw else "sfw")
+
+        # 1️⃣ Try WARM_CACHE buffers first
+        random.shuffle(subs)
+        for listing in ("hot", "new"):
+            for sub in subs:
+                key = f"{sub}_{listing}"
+                buf = WARM_CACHE.get(key)
+                if buf:
+                    while buf:
+                        post = buf.pop()
+                        if not post:
+                            continue
+                        data = extract_post_data(post)
+                        await self._send_cached(ctx, data, keyword or "", "WARM CACHE", nsfw)
+                        return True
+
+        # 2️⃣ Local fallback bundle
+        config = getattr(self.bot.config, "MEME_CACHE", {})
+        folder = config.get("fallback_dir")
+        if folder:
+            fname = "nsfw.json" if nsfw else "sfw.json"
+            path = os.path.join(folder, fname)
+            if os.path.exists(path):
+                try:
+                    with open(path, "r") as f:
+                        posts = json.load(f)
+                except Exception:
+                    posts = []
+                if posts:
+                    post_dict = random.choice(posts)
+                    await self._send_cached(ctx, post_dict, keyword or "", "LOCAL", nsfw)
+                    return True
+
+        return False
 
     @commands.Cog.listener()
     async def on_reaction_add(self, reaction, user):
@@ -172,6 +221,8 @@ class Meme(commands.Cog):
             rand_sub = random.choice(all_subs)
             post = await simple_random_meme(self.reddit, rand_sub)
             if not post:
+                if await self._try_cache_or_local(ctx, nsfw=False, keyword=keyword):
+                    return
                 ctx._no_reward = True
                 return await ctx.interaction.followup.send(
                     "✅ No memes found—try again later!", ephemeral=True
@@ -195,6 +246,8 @@ class Meme(commands.Cog):
             result.picked_via = "random"
             attempts += 1
         if not post or post.id in recent_ids:
+            if await self._try_cache_or_local(ctx, nsfw=False, keyword=keyword):
+                return
             ctx._no_reward = True
             return await ctx.interaction.followup.send(
                 "✅ No fresh memes right now—try again later!", ephemeral=True
@@ -281,10 +334,13 @@ class Meme(commands.Cog):
             all_subs = get_guild_subreddits(ctx.guild.id, "nsfw")
             rand_sub = random.choice(all_subs)
             post = await simple_random_meme(self.reddit, rand_sub)
-            #if not post:
-            #    return await ctx.interaction.followup.send(
-            #        "✅ No NSFW memes right now—try again later!", ephemeral=True
-            #    )
+            if not post:
+                if await self._try_cache_or_local(ctx, nsfw=True, keyword=keyword):
+                    return
+                ctx._no_reward = True
+                return await ctx.interaction.followup.send(
+                    "✅ No NSFW memes right now—try again later!", ephemeral=True
+                )
             result = type("F", (), {})()
             result.source_subreddit = rand_sub
             result.picked_via       = "random"
@@ -303,6 +359,8 @@ class Meme(commands.Cog):
             result.picked_via = "random"
             attempts += 1
         if not post or post.id in recent_ids:
+            if await self._try_cache_or_local(ctx, nsfw=True, keyword=keyword):
+                return
             ctx._no_reward = True
             return await ctx.interaction.followup.send(
                 "✅ No fresh NSFW memes right now—try again later!", ephemeral=True
