@@ -85,6 +85,51 @@ async def _fetch_listing_with_retry(
         f"Failed to fetch listing {listing} from {subreddit.display_name} after {retries} retries"
     )
 
+
+async def _search_with_retry(
+    subreddit: Subreddit,
+    keyword: str,
+    limit: int,
+    retries: int = 3,
+    backoff: int = 1,
+) -> AsyncIterator[Submission]:
+    """Search a subreddit for keyword with retry/backoff."""
+    for attempt in range(1, retries + 1):
+        try:
+            log.debug(
+                "Searching '%s' in r/%s (limit=%d, attempt %d)",
+                keyword,
+                subreddit.display_name,
+                limit,
+                attempt,
+            )
+            await throttle()
+            count = 0
+            async for p in subreddit.search(keyword, limit=limit):
+                count += 1
+                yield p
+            log.debug(
+                "Search fetched %d posts from r/%s for '%s'",
+                count,
+                subreddit.display_name,
+                keyword,
+            )
+            return
+        except Exception as e:
+            log.warning(
+                "Error searching '%s' in r/%s (attempt %d/%d): %s",
+                keyword,
+                subreddit.display_name,
+                attempt,
+                retries,
+                e,
+            )
+            await asyncio.sleep(backoff * (2 ** (attempt - 1)))
+    raise RedditMemeError(
+        f"Failed to search '{keyword}' in {subreddit.display_name} after {retries} retries",
+    )
+
+
 async def _fetch_concurrent(
     subreddits: Sequence[Subreddit],
     listing: str,
@@ -348,21 +393,37 @@ async def fetch_meme(
         posts: List[Tuple[Submission, dict]] = []
         listing_used: Optional[str] = None
         try:
-            # create subreddit objects (concurrently) then iterate through listings
+            # create subreddit objects (concurrently)
             sub_objs = await asyncio.gather(
                 *(reddit.subreddit(s) for s in subreddits)
             )
-            for listing_choice in listings:
-                posts = []
-                posts_by_sub = await _fetch_concurrent(sub_objs, listing_choice, limit)
-                for sub_name, post_list in posts_by_sub.items():
-                    for post in post_list:
+
+            # search each subreddit for the keyword first
+            for sub_obj in sub_objs:
+                try:
+                    async for post in _search_with_retry(sub_obj, keyword, limit):
                         if is_valid_post(post):
                             data = extract_fn(post)
                             posts.append((post, data))
-                if posts:
-                    listing_used = listing_choice
-                    break
+                except Exception:
+                    # if search isn't supported or fails, skip to listings
+                    continue
+
+            if not posts:
+                # fallback to listings if search yielded nothing
+                for listing_choice in listings:
+                    posts = []
+                    posts_by_sub = await _fetch_concurrent(sub_objs, listing_choice, limit)
+                    for sub_name, post_list in posts_by_sub.items():
+                        for post in post_list:
+                            if is_valid_post(post):
+                                data = extract_fn(post)
+                                posts.append((post, data))
+                    if posts:
+                        listing_used = listing_choice
+                        break
+            else:
+                listing_used = "search"
         except Exception:
             posts = []
 
