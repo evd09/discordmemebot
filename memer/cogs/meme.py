@@ -55,8 +55,8 @@ class Meme(commands.Cog):
         self.bot = bot
         try:
             log.info("Meme cog initializing...")
-        except Exception as e:
-            print("[MEME COG INIT ERROR]", e)
+        except Exception:
+            log.error("[MEME COG INIT ERROR]", exc_info=True)
         self.recent_ids = defaultdict(lambda: deque(maxlen=200))
         log.info("MemeBot initialized at %s", datetime.utcnow())
 
@@ -73,8 +73,8 @@ class Meme(commands.Cog):
         )
         try:
             log.info("Reddit + Cache initialized")
-        except Exception as e:
-            print("[CACHE INIT ERROR]", e)
+        except Exception:
+            log.error("[CACHE INIT ERROR]", exc_info=True)
 
         # Start prune task
         self._prune_cache.start()
