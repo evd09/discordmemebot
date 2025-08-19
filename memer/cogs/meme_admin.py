@@ -79,24 +79,111 @@ class ToggleGamblingModal(discord.ui.Modal, title="Toggle Gambling"):
         await self.cog.handle_toggle_gambling(interaction, enable)
 
 
-class SetEntranceModal(discord.ui.Modal, title="Set Entrance"):
-    def __init__(self, cog: "MemeAdmin"):
-        super().__init__()
-        self.cog = cog
-        self.user_id = discord.ui.TextInput(label="User ID")
-        self.filename = discord.ui.TextInput(label="Filename")
-        self.add_item(self.user_id)
-        self.add_item(self.filename)
+class AdminUserSelect(discord.ui.UserSelect):
+    def __init__(self, view: "AdminSetEntranceView"):
+        super().__init__(row=0)
+        self.view = view
 
-    async def on_submit(self, interaction: discord.Interaction):
-        try:
-            user = await interaction.client.fetch_user(int(self.user_id.value))
-        except Exception:
+    async def callback(self, interaction: discord.Interaction):
+        self.view.selected_user = self.values[0]
+        await interaction.response.defer()
+
+
+class AdminFileSelect(discord.ui.Select):
+    def __init__(self, view: "AdminSetEntranceView", options):
+        super().__init__(
+            placeholder="Select file",
+            options=options,
+            custom_id="file_select",
+            row=1,
+        )
+        self.view = view
+
+    async def callback(self, interaction: discord.Interaction):
+        self.view.selected_file = self.values[0]
+        await interaction.response.defer()
+
+
+class AdminSetEntranceView(discord.ui.View):
+    def __init__(self, cog: "MemeAdmin", files):
+        super().__init__(timeout=60)
+        self.cog = cog
+        self.files = files
+        self.selected_user: Optional[discord.abc.User] = None
+        self.selected_file: Optional[str] = None
+        self.page = 0
+        self.page_size = 25
+        self.max_page = (len(self.files) - 1) // self.page_size
+
+        self.add_item(AdminUserSelect(self))
+        self.add_file_select()
+        self.add_pagination()
+
+    @property
+    def content(self) -> str:
+        return f"Select a user and entrance file (Page {self.page+1}/{self.max_page+1})"
+
+    def add_file_select(self):
+        for child in list(self.children):
+            if isinstance(child, discord.ui.Select) and getattr(child, "custom_id", None) == "file_select":
+                self.remove_item(child)
+        start = self.page * self.page_size
+        end = start + self.page_size
+        current = self.files[start:end]
+        options = [discord.SelectOption(label=f) for f in current]
+        self.add_item(AdminFileSelect(self, options))
+
+    def add_pagination(self):
+        for child in list(self.children):
+            if isinstance(child, discord.ui.Button) and getattr(child, "custom_id", None) in ("prev_page", "next_page"):
+                self.remove_item(child)
+        if self.max_page > 0:
+            prev = discord.ui.Button(
+                label="⬅️ Prev",
+                style=discord.ButtonStyle.secondary,
+                custom_id="prev_page",
+                row=3,
+                disabled=self.page == 0,
+            )
+            prev.callback = self.prev_page
+            self.add_item(prev)
+
+            nextb = discord.ui.Button(
+                label="Next ➡️",
+                style=discord.ButtonStyle.secondary,
+                custom_id="next_page",
+                row=3,
+                disabled=self.page == self.max_page,
+            )
+            nextb.callback = self.next_page
+            self.add_item(nextb)
+
+    async def prev_page(self, interaction: discord.Interaction):
+        self.page -= 1
+        self.add_file_select()
+        self.add_pagination()
+        await interaction.response.edit_message(content=self.content, view=self)
+
+    async def next_page(self, interaction: discord.Interaction):
+        self.page += 1
+        self.add_file_select()
+        self.add_pagination()
+        await interaction.response.edit_message(content=self.content, view=self)
+
+    @discord.ui.button(label="Save", style=discord.ButtonStyle.success, row=2)
+    async def save(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not self.selected_user or not self.selected_file:
             await interaction.response.send_message(
-                "Invalid user ID.", ephemeral=True
+                "Please select a user and a file.", ephemeral=True
             )
             return
-        await self.cog.handle_setentrance(interaction, user, self.filename.value)
+        await self.cog.handle_setentrance(
+            interaction, self.selected_user, self.selected_file
+        )
+        for child in self.children:
+            child.disabled = True
+        await interaction.message.edit(view=self)
+        self.stop()
 
 
 class AdminView(discord.ui.View):
@@ -138,7 +225,22 @@ class AdminView(discord.ui.View):
 
     @discord.ui.button(label="Set Entrance", style=discord.ButtonStyle.secondary)
     async def set_entrance(self, interaction: discord.Interaction, _: discord.ui.Button):
-        await interaction.response.send_modal(SetEntranceModal(self.cog))
+        entrance_cog = self.cog.bot.get_cog("Entrance")
+        if entrance_cog is None:
+            await interaction.response.send_message(
+                "Entrance cog not loaded.", ephemeral=True
+            )
+            return
+        files = entrance_cog.get_valid_files()
+        if not files:
+            await interaction.response.send_message(
+                "No entrance sounds available.", ephemeral=True
+            )
+            return
+        view = AdminSetEntranceView(self.cog, files)
+        await interaction.response.send_message(
+            view.content, view=view, ephemeral=True
+        )
 
     @discord.ui.button(label="Cache Info", style=discord.ButtonStyle.secondary)
     async def cache_info(self, interaction: discord.Interaction, _: discord.ui.Button):
