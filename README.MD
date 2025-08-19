@@ -283,6 +283,17 @@ Run the listing script afterward to verify removal.
 ## 🎉 Contributing & Testing ##
 - Open issues or PRs for improvements.
 - Use a test guild (GUILD_ID) to verify slash command syncing.
+- When `DEV_GUILD_ID` is configured, commands only sync to that guild for quicker testing.
+  To propagate changes globally you must manually run a global sync:
+
+  ```python
+  @bot.command()
+  @commands.is_owner()
+  async def sync_global(ctx):
+      """Push updated slash commands to every guild."""
+      await bot.tree.sync()
+      await ctx.send("Synced globally!")
+  ```
 - Ensure .env is configured before running.
 
 
