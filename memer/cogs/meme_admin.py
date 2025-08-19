@@ -315,12 +315,13 @@ class AdminSetEntranceView(discord.ui.View):
                 "Please select a user and a file.", ephemeral=True
             )
             return
+        await interaction.response.defer(ephemeral=True)
         await self.cog.handle_setentrance(
             interaction, self.selected_user, self.selected_file
         )
         for child in self.children:
             child.disabled = True
-        await interaction.message.edit(view=self)
+        await interaction.edit_original_response(view=self)
         self.stop()
 
 
@@ -568,20 +569,21 @@ class MemeAdmin(commands.Cog):
         self, interaction: discord.Interaction, user: discord.User, filename: str
     ):
         entrance_cog = self.bot.get_cog("Entrance")
+        send = (
+            interaction.followup.send
+            if interaction.response.is_done()
+            else interaction.response.send_message
+        )
         if entrance_cog is None:
-            await interaction.response.send_message(
-                "Entrance cog not loaded.", ephemeral=True
-            )
+            await send("Entrance cog not loaded.", ephemeral=True)
             return
         files = entrance_cog.get_valid_files()
         if filename not in files:
-            await interaction.response.send_message(
-                "That file doesn't exist!", ephemeral=True
-            )
+            await send("That file doesn't exist!", ephemeral=True)
             return
         entrance_cog.entrance_data[str(user.id)] = {"file": filename, "volume": 1.0}
         entrance_cog.save_data()
-        await interaction.response.send_message(
+        await send(
             f"Set `{filename}` as entrance for {user.mention}.", ephemeral=True
         )
 
