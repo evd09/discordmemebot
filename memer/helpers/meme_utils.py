@@ -10,6 +10,7 @@ import discord
 log = logging.getLogger(__name__)
 
 IMAGE_EXT = (".jpg", ".jpeg", ".png", ".gif")
+VIDEO_EXT = (".mp4", ".webm")
 
 async def send_meme(
     ctx: Context,
@@ -18,14 +19,22 @@ async def send_meme(
     content: Optional[str] = None,
     embed: Optional[Embed] = None,
 ):
-    """
-    If embed is provided, set its image to `url` and send (embed + optional content).
-    Otherwise just send the raw link (with optional content above it).
-    """
-    if embed:
-        embed.set_image(url=url)
+    """Send a meme URL.
 
-    text = f"{content}\n{url}" if content else url
+    If ``embed`` is provided, the URL is attached as the embed image unless it
+    points to a video (``.mp4``/``.webm``). For video links the URL is appended
+    to the message content so Discord can render the player inline.
+    """
+    is_video = url.lower().endswith(VIDEO_EXT)
+
+    if embed:
+        if not is_video:
+            embed.set_image(url=url)
+            text = content
+        else:
+            text = f"{content}\n{url}" if content else url
+    else:
+        text = f"{content}\n{url}" if content else url
 
     if getattr(ctx, "interaction", None) and not ctx.interaction.response.is_done():
         try:
@@ -36,14 +45,14 @@ async def send_meme(
     try:
         if getattr(ctx, "interaction", None):
             if embed:
-                return await ctx.interaction.followup.send(content=content, embed=embed)
+                return await ctx.interaction.followup.send(content=text, embed=embed)
             log.debug("🔥 send_meme (plain link) → %s", text)
             return await ctx.interaction.followup.send(content=text)
     except discord.errors.NotFound:
         pass
 
     if embed:
-        return await ctx.send(content=content, embed=embed)
+        return await ctx.send(content=text, embed=embed)
     log.debug("🔥 send_meme fallback (plain link) → %s", text)
     return await ctx.send(text)
 
