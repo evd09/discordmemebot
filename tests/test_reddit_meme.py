@@ -33,10 +33,10 @@ class DummyCache:
 
 
 class FakePost:
-    def __init__(self, title, subreddit="testsub"):
+    def __init__(self, title, subreddit="testsub", id="xyz"):
         self.title = title
         self.url = "http://example.com/img.jpg"
-        self.id = "xyz"
+        self.id = id
         self.subreddit = SimpleNamespace(display_name=subreddit)
 
 
@@ -164,3 +164,33 @@ def test_keyword_search_across_multiple_subreddits():
     assert titles == {"cat in sub1", "another cat here"}
     assert result.errors == []
     assert result.source_subreddit in {"sub1", "sub2"}
+
+
+def test_fetch_meme_excludes_ids():
+    random.seed(0)
+    posts = [
+        FakePost("first", id="a1"),
+        FakePost("second", id="a2"),
+    ]
+    reddit = FakeReddit(posts)
+    cache = DummyCache()
+
+    chosen = []
+
+    def extract_fn(p):
+        chosen.append(p.id)
+        return {"title": p.title, "media_url": "url", "subreddit": "testsub"}
+
+    asyncio.run(
+        fetch_meme(
+            reddit,
+            ["testsub"],
+            cache,
+            listings=("hot",),
+            limit=10,
+            extract_fn=extract_fn,
+            exclude_ids=["a1"],
+        )
+    )
+
+    assert chosen == ["a2"]

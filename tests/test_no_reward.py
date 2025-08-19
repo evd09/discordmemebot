@@ -29,6 +29,10 @@ def test_nsfwmeme_in_sfw_channel_sets_no_reward():
         channel=SimpleNamespace(is_nsfw=lambda: False),
         interaction=DummyInteraction(),
     )
+    async def fake_get_recent_post_ids(*args, **kwargs):
+        return []
+
+    meme_mod.get_recent_post_ids = fake_get_recent_post_ids
     asyncio.run(Meme.nsfwmeme(meme_cog, ctx))
     assert getattr(ctx, "_no_reward", False) is True
 
@@ -64,6 +68,11 @@ def test_meme_uses_local_fallback_when_no_posts(monkeypatch):
     meme_cog.reddit = SimpleNamespace()
     meme_cog.cache_service = SimpleNamespace(cache_mgr=None)
     meme_cog.bot = SimpleNamespace(config=SimpleNamespace(MEME_CACHE={'fallback_dir': 'data/fallback_memes'}))
+
+    async def fake_get_recent_post_ids(*args, **kwargs):
+        return []
+
+    monkeypatch.setattr(meme_mod, 'get_recent_post_ids', fake_get_recent_post_ids)
 
     ctx = SimpleNamespace(
         guild=SimpleNamespace(id=1),

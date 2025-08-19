@@ -210,14 +210,18 @@ async def fetch_meme(
     extract_fn=None,
     filters: Optional[Sequence[Callable[[Submission], bool]]] = None,
     nsfw: bool = False,
+    exclude_ids: Optional[Sequence[str]] = None,
 ) -> MemeResult:
     from memer.helpers.meme_utils import extract_post_data
     extract_fn = extract_fn or extract_post_data
 
     regex = re.compile(rf'\b{re.escape(keyword.lower())}\b') if keyword else None
+    exclude_ids_set = set(exclude_ids or [])
 
     def is_valid_post(p: Submission) -> bool:
         if not p or not getattr(p, "url", None):
+            return False
+        if exclude_ids_set and getattr(p, "id", None) in exclude_ids_set:
             return False
         if regex and not regex.search((p.title or "").lower()):
             return False
@@ -230,22 +234,47 @@ async def fetch_meme(
         # (1) RAM cache
         posts = cache_mgr.get_from_ram(keyword, nsfw=nsfw)
         if posts:
-            valid = [p for p in posts if p.get("media_url")]
+            valid = [
+                p
+                for p in posts
+                if p.get("media_url") and p.get("post_id") not in exclude_ids_set
+            ]
             if valid:
                 chosen = random.choice(valid)
-                return MemeResult(None, chosen.get("subreddit"), "cache_ram", [keyword], [], "cache")
+                return MemeResult(
+                    None,
+                    chosen.get("subreddit"),
+                    "cache_ram",
+                    [keyword],
+                    [],
+                    "cache",
+                )
 
         # (2) Disk cache
         posts = await cache_mgr.get_from_disk(keyword, nsfw=nsfw)
         if posts:
-            chosen = random.choice([p for p in posts if p.get("media_url")])
-            class Cached:
-                title     = chosen["title"]
-                permalink = f"/r/{chosen['subreddit']}/comments/{chosen['post_id']}/"
-                url       = chosen["media_url"]
-                id        = chosen["post_id"]
-                author    = chosen.get("author") or "[deleted]"
-            return MemeResult(Cached, chosen["subreddit"], "cache_disk", [keyword], [], "cache")
+            valid = [
+                p
+                for p in posts
+                if p.get("media_url") and p.get("post_id") not in exclude_ids_set
+            ]
+            if valid:
+                chosen = random.choice(valid)
+                class Cached:
+                    title = chosen["title"]
+                    permalink = f"/r/{chosen['subreddit']}/comments/{chosen['post_id']}/"
+                    url = chosen["media_url"]
+                    id = chosen["post_id"]
+                    author = chosen.get("author") or "[deleted]"
+
+                return MemeResult(
+                    Cached,
+                    chosen["subreddit"],
+                    "cache_disk",
+                    [keyword],
+                    [],
+                    "cache",
+                )
 
         # (3) Disabled?
         if cache_mgr.is_disabled(keyword, nsfw=nsfw):
