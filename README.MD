@@ -226,8 +226,9 @@ Subreddit management is handled through `/memeadmin` buttons or automatic refres
 	- Use /entrance and /beeps in a real voice channel, not DM
 	- All logs are in /logs/, check for details
 - File not found?
-	- Check file permissions and paths for sounds/entrances/ and sounds/beeps/
-	- File extension (e.g., .mp3, .wav) must match
+        - Check file permissions and paths for sounds/entrances/ and sounds/beeps/
+        - File extension (e.g., .mp3, .wav) must match
+        - Permission denied uploading to `sounds/`? Change ownership (e.g., `sudo chown eric:eric sounds`)
 ---
 ## ⚠️ Rate Limits & Best Practices ##
 - Reddit API rate limit: ~60 requests/minute (varies). The bot enforces smart throttling with user notifications.
