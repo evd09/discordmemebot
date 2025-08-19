@@ -1,4 +1,5 @@
 import logging
+import discord
 from discord.ext import commands
 from memer.helpers.store import Store
 
@@ -80,31 +81,62 @@ class Economy(commands.Cog):
         # otherwise let the default handler run
         # (do not re-raise here)
 
-    @gambling_enabled_ctx()
-    @commands.hybrid_command(name="balance", description="Check your balance")
-    async def balance(self, ctx: commands.Context):
-        uid  = str(ctx.author.id)
-        bal  = await self.store.get_balance(uid)
+    async def _send_balance(self, interaction: discord.Interaction):
+        uid = str(interaction.user.id)
+        bal = await self.store.get_balance(uid)
         name = self.bot.config.COIN_NAME
-        await ctx.reply(f"💰 You have {bal} {name}.", ephemeral=bool(ctx.interaction))
+        await interaction.response.send_message(f"💰 You have {bal} {name}.", ephemeral=True)
 
-    @gambling_enabled_ctx()
-    @commands.hybrid_command(name="buy", description="Purchase a shop item")
-    async def buy(self, ctx: commands.Context, item: str):
+    async def _buy_item(self, interaction: discord.Interaction, item: str):
         shop = {"skipcooldown": 50, "premium-sub": 200}
         cost = shop.get(item)
         name = self.bot.config.COIN_NAME
         if cost is None:
-            return await ctx.reply("❌ Unknown item.", ephemeral=bool(ctx.interaction))
+            await interaction.response.send_message("❌ Unknown item.", ephemeral=True)
+            return
 
-        uid = str(ctx.author.id)
+        uid = str(interaction.user.id)
         bal = await self.store.get_balance(uid)
         if bal < cost:
-            return await ctx.reply(f"❌ Need {cost} {name}, but have {bal}.", ephemeral=bool(ctx.interaction))
+            await interaction.response.send_message(f"❌ Need {cost} {name}, but have {bal}.", ephemeral=True)
+            return
 
         await self.store.update_balance(uid, -cost, f"Bought {item}")
         new = await self.store.get_balance(uid)
-        await ctx.reply(f"✅ Bought **{item}** for {cost} {name}. You now have {new} {name}.", ephemeral=bool(ctx.interaction))
+        await interaction.response.send_message(
+            f"✅ Bought **{item}** for {cost} {name}. You now have {new} {name}.",
+            ephemeral=True,
+        )
+
+    class StoreView(discord.ui.View):
+        def __init__(self, cog: "Economy", author_id: int):
+            super().__init__()
+            self.cog = cog
+            self.author_id = author_id
+
+        async def interaction_check(self, interaction: discord.Interaction) -> bool:
+            if interaction.user.id != self.author_id:
+                await interaction.response.send_message("❌ This store isn't for you.", ephemeral=True)
+                return False
+            return True
+
+        @discord.ui.button(label="Balance", style=discord.ButtonStyle.primary)
+        async def balance_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+            await self.cog._send_balance(interaction)
+
+        @discord.ui.button(label="Buy Skipcooldown (50)", style=discord.ButtonStyle.secondary)
+        async def buy_skip(self, interaction: discord.Interaction, button: discord.ui.Button):
+            await self.cog._buy_item(interaction, "skipcooldown")
+
+        @discord.ui.button(label="Buy Premium-Sub (200)", style=discord.ButtonStyle.secondary)
+        async def buy_premium(self, interaction: discord.Interaction, button: discord.ui.Button):
+            await self.cog._buy_item(interaction, "premium-sub")
+
+    @gambling_enabled_ctx()
+    @commands.hybrid_command(name="store", description="Open the store interface")
+    async def store_cmd(self, ctx: commands.Context):
+        view = self.StoreView(self, ctx.author.id)
+        await ctx.reply("🛒 Welcome to the store!", view=view, ephemeral=bool(ctx.interaction))
 
 async def setup(bot):
     await bot.add_cog(Economy(bot))
