@@ -185,6 +185,7 @@ class Meme(commands.Cog):
             url=f"https://reddit.com{post.permalink}",
             description=f"r/{result.source_subreddit} • u/{post.author}"
         )
+        embed.set_footer(text=f"via {result.picked_via.upper()}")
 
         raw_url   = get_image_url(post)
         embed_url = get_rxddit_url(raw_url)
@@ -270,6 +271,7 @@ class Meme(commands.Cog):
             url=f"https://reddit.com{post.permalink}",
             description=f"r/{result.source_subreddit} • u/{post.author}"
         )
+        embed.set_footer(text=f"via {result.picked_via.upper()}")
 
         raw_url   = get_image_url(post)
         embed_url = get_rxddit_url(raw_url)
@@ -365,8 +367,9 @@ class Meme(commands.Cog):
             embed = Embed(
                 title=post.title[:256],
                 url=f"https://reddit.com{post.permalink}",
-                description=f"r/{subreddit} • u/{post.author}"
+                description=f"r/{result.source_subreddit} • u/{post.author}"
             )
+            embed.set_footer(text=f"via {result.picked_via.upper()}")
 
             content = None
             if getattr(result, "picked_via", None) == "random":
