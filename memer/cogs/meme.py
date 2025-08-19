@@ -37,6 +37,7 @@ from memer.helpers.meme_utils import (
 )
 from memer.helpers.meme_cache_service import MemeCacheService
 from memer.helpers.db import get_recent_post_ids, register_meme_message
+from memer.helpers.reddit_cache import NoopCacheManager
 # Refactored utilities and cache
 from memer.reddit_meme import (
     fetch_meme      as fetch_meme_util,
@@ -453,11 +454,21 @@ class Meme(commands.Cog):
 
         try:
             recent_ids = await get_recent_post_ids(ctx.channel.id, limit=20)
+
+            category = "nsfw" if getattr(sub, "over18", False) else "sfw"
+            loaded = [s.lower() for s in get_guild_subreddits(ctx.guild.id, category)]
+            use_cache = subreddit.lower() in loaded
+            cache_mgr = (
+                self.cache_service.cache_mgr
+                if use_cache and getattr(self.cache_service, "cache_mgr", None)
+                else NoopCacheManager()
+            )
+
             result = await fetch_meme_util(
                 reddit=self.reddit,
                 subreddits=[sub],
                 keyword=keyword,
-                cache_mgr=self.cache_service.cache_mgr,
+                cache_mgr=cache_mgr,
                 nsfw=bool(getattr(sub, "over18", False)),
                 exclude_ids=recent_ids,
             )
