@@ -219,9 +219,8 @@ class ToggleGamblingModal(discord.ui.Modal, title="Toggle Gambling"):
 
 
 class AdminUserSelect(discord.ui.UserSelect):
-    def __init__(self, view: "AdminSetEntranceView"):
+    def __init__(self):
         super().__init__(row=0)
-        self.view = view
 
     async def callback(self, interaction: discord.Interaction):
         self.view.selected_user = self.values[0]
@@ -229,14 +228,13 @@ class AdminUserSelect(discord.ui.UserSelect):
 
 
 class AdminFileSelect(discord.ui.Select):
-    def __init__(self, view: "AdminSetEntranceView", options):
+    def __init__(self, options):
         super().__init__(
             placeholder="Select file",
             options=options,
             custom_id="file_select",
             row=1,
         )
-        self.view = view
 
     async def callback(self, interaction: discord.Interaction):
         self.view.selected_file = self.values[0]
@@ -254,7 +252,7 @@ class AdminSetEntranceView(discord.ui.View):
         self.page_size = 25
         self.max_page = (len(self.files) - 1) // self.page_size
 
-        self.add_item(AdminUserSelect(self))
+        self.add_item(AdminUserSelect())
         self.add_file_select()
         self.add_pagination()
 
@@ -270,7 +268,7 @@ class AdminSetEntranceView(discord.ui.View):
         end = start + self.page_size
         current = self.files[start:end]
         options = [discord.SelectOption(label=f) for f in current]
-        self.add_item(AdminFileSelect(self, options))
+        self.add_item(AdminFileSelect(options))
 
     def add_pagination(self):
         for child in list(self.children):
