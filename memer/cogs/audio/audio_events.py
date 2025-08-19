@@ -3,10 +3,13 @@ import os
 import json
 import time
 import asyncio
+import logging
 import discord
 from .audio_queue import queue_audio
 from .audio_player import play_clip
 from .constants import SOUND_FOLDER, ENTRANCE_DATA
+
+log = logging.getLogger(__name__)
 
 # --- Idle timeout settings (defaults) ---
 IDLE_TIMEOUT_DEFAULT = 600  # seconds
@@ -88,8 +91,8 @@ async def on_voice_state_update(member: discord.Member, before, after):
             if not guild.voice_client:
                 try:
                     await vc.connect()
-                except Exception as e:
-                    print(f"[VOICE JOIN ERROR] {e}")
+                except Exception:
+                    log.error("[VOICE JOIN ERROR]", exc_info=True)
 
             filename = user_data["file"]
             volume = user_data.get("volume", 1.0)
@@ -115,8 +118,8 @@ async def on_voice_state_update(member: discord.Member, before, after):
         if bot_in_channel and len(real_users) == 0:
             try:
                 await guild.voice_client.disconnect(force=True)
-            except Exception as e:
-                print(f"[VOICE LEAVE ERROR] {e}")
+            except Exception:
+                log.error("[VOICE LEAVE ERROR]", exc_info=True)
             # Cancel idle timer for this guild
             await maybe_cancel_idle_task(guild.id)
 
