@@ -21,6 +21,7 @@ from .audio.audio_events import get_guild_config
 from .audio.beep import load_beeps
 from .audio.audio_player import preload_audio_clips, audio_cache
 from .audio.constants import SOUND_FOLDER
+from memer.helpers.reply import safe_reply
 
 log = logging.getLogger(__name__)
 
@@ -409,37 +410,38 @@ class MemeAdmin(commands.Cog):
     @app_commands.command(name="memeadmin", description="Admin commands for MEMER")
     async def memeadmin(self, interaction: discord.Interaction):
         if not interaction.user.guild_permissions.administrator:
-            await interaction.response.send_message(
-                "❌ Only admins can use this command.", ephemeral=True
-            )
+            await safe_reply(interaction, "❌ Only admins can use this command.", ephemeral=True)
             return
         view = AdminView(self)
-        await interaction.response.send_message(
-            "Select an admin action:", view=view, ephemeral=True
+        view.message = await safe_reply(
+            interaction, content="Select an admin action:", view=view, ephemeral=True
         )
-        view.message = await interaction.original_response()
 
     # ----- Handlers -----
     async def handle_ping(self, interaction: discord.Interaction):
         latency_ms = round(self.bot.latency * 1000)
-        await interaction.response.send_message(
-            f"🏓 Pong! Latency is {latency_ms}ms", ephemeral=True
+        await safe_reply(
+            interaction, content=f"🏓 Pong! Latency is {latency_ms}ms", ephemeral=True
         )
 
     async def handle_uptime(self, interaction: discord.Interaction):
         elapsed = time.time() - self.start_time
         hours, rem = divmod(int(elapsed), 3600)
         minutes, seconds = divmod(rem, 60)
-        await interaction.response.send_message(
-            f"⏱️ Uptime: {hours}h {minutes}m {seconds}s", ephemeral=True
+        await safe_reply(
+            interaction,
+            content=f"⏱️ Uptime: {hours}h {minutes}m {seconds}s",
+            ephemeral=True,
         )
 
     async def handle_addsubreddit(
         self, interaction: discord.Interaction, name: str, category: str
     ):
         if category not in ("sfw", "nsfw"):
-            await interaction.response.send_message(
-                "Category must be 'sfw' or 'nsfw'.", ephemeral=True
+            await safe_reply(
+                interaction,
+                content="Category must be 'sfw' or 'nsfw'.",
+                ephemeral=True,
             )
             return
         add_guild_subreddit(interaction.guild.id, name, category)
@@ -450,8 +452,9 @@ class MemeAdmin(commands.Cog):
                 f"\n⚠️ **Warning:** {category.upper()} subreddits now has {count} entries. "
                 "Too many may slow the bot or hit API limits!"
             )
-        await interaction.response.send_message(
-            f"✅ Added `{name}` to {category.upper()} subreddits for this server.{warning}",
+        await safe_reply(
+            interaction,
+            content=f"✅ Added `{name}` to {category.upper()} subreddits for this server.{warning}",
             ephemeral=True,
         )
 
@@ -460,8 +463,9 @@ class MemeAdmin(commands.Cog):
     ):
         await interaction.response.defer(ephemeral=True)
         remove_guild_subreddit(interaction.guild.id, name, category)
-        await interaction.followup.send(
-            f"✅ Removed `{name}` from the {category.upper()} subreddits list for this server.",
+        await safe_reply(
+            interaction,
+            content=f"✅ Removed `{name}` from the {category.upper()} subreddits list for this server.",
             ephemeral=True,
         )
 
@@ -469,7 +473,7 @@ class MemeAdmin(commands.Cog):
         await interaction.response.defer(ephemeral=True)
         meme_cog = self.bot.get_cog("Meme")
         if meme_cog is None:
-            await interaction.followup.send("❌ Meme cog not loaded.", ephemeral=True)
+            await safe_reply(interaction, content="❌ Meme cog not loaded.", ephemeral=True)
             return
         results = {"sfw": [], "nsfw": []}
         for cat in ["sfw", "nsfw"]:
@@ -488,15 +492,16 @@ class MemeAdmin(commands.Cog):
             lines.append(f"**{cat.upper()}** ({valids}/{total} valid):")
             for name, status in results[cat]:
                 lines.append(f"{status} {name}")
-        await interaction.followup.send("\n".join(lines), ephemeral=True)
+        await safe_reply(interaction, content="\n".join(lines), ephemeral=True)
 
     async def handle_reset_voice_error(self, interaction: discord.Interaction):
         gid = interaction.guild.id
         reset_queue(gid)
         reset_total_failures(gid)
         get_queue(gid).clear()
-        await interaction.response.send_message(
-            "✅ Voice error status/cooldown for this server has been reset. Try your entrance or beep again!",
+        await safe_reply(
+            interaction,
+            content="✅ Voice error status/cooldown for this server has been reset. Try your entrance or beep again!",
             ephemeral=True,
         )
 
@@ -507,8 +512,9 @@ class MemeAdmin(commands.Cog):
         conf["enabled"] = enabled
         if seconds is not None and enabled:
             conf["seconds"] = max(10, int(seconds))
-        await interaction.response.send_message(
-            f"✅ Idle timeout is now {'ENABLED' if enabled else 'DISABLED'}"
+        await safe_reply(
+            interaction,
+            content=f"✅ Idle timeout is now {'ENABLED' if enabled else 'DISABLED'}"
             + (f" ({conf['seconds']}s)" if enabled else ""),
             ephemeral=True,
         )
@@ -518,15 +524,19 @@ class MemeAdmin(commands.Cog):
     ):
         gamble_cog = self.bot.get_cog("Gamble")
         if gamble_cog is None:
-            await interaction.response.send_message(
-                "❌ Gambling cog not loaded.", ephemeral=True
+            await safe_reply(
+                interaction,
+                content="❌ Gambling cog not loaded.",
+                ephemeral=True,
             )
             return
         guild_id = str(interaction.guild.id)
         await gamble_cog.store.set_gambling(guild_id, enable)
         status = "enabled" if enable else "disabled"
-        await interaction.response.send_message(
-            f"✅ Gambling has been **{status}** on this server.", ephemeral=True
+        await safe_reply(
+            interaction,
+            content=f"✅ Gambling has been **{status}** on this server.",
+            ephemeral=True,
         )
 
     async def handle_setentrance(
@@ -534,33 +544,39 @@ class MemeAdmin(commands.Cog):
     ):
         entrance_cog = self.bot.get_cog("Entrance")
         if entrance_cog is None:
-            await interaction.response.send_message(
-                "Entrance cog not loaded.", ephemeral=True
+            await safe_reply(
+                interaction,
+                content="Entrance cog not loaded.",
+                ephemeral=True,
             )
             return
         files = entrance_cog.get_valid_files()
         if filename not in files:
-            await interaction.response.send_message(
-                "That file doesn't exist!", ephemeral=True
+            await safe_reply(
+                interaction,
+                content="That file doesn't exist!",
+                ephemeral=True,
             )
             return
         entrance_cog.entrance_data[str(user.id)] = {"file": filename, "volume": 1.0}
         entrance_cog.save_data()
-        await interaction.response.send_message(
-            f"Set `{filename}` as entrance for {user.mention}.", ephemeral=True
+        await safe_reply(
+            interaction,
+            content=f"Set `{filename}` as entrance for {user.mention}.",
+            ephemeral=True,
         )
 
     async def handle_cacheinfo(self, interaction: discord.Interaction):
         meme_cog = self.bot.get_cog("Meme")
         if meme_cog is None:
-            await interaction.response.send_message(
-                "Meme cog not loaded.", ephemeral=True
+            await safe_reply(
+                interaction,
+                content="Meme cog not loaded.",
+                ephemeral=True,
             )
             return
         stats = await meme_cog.cache_service.get_cache_info()
-        await interaction.response.send_message(
-            f"```\n{stats}\n```", ephemeral=True
-        )
+        await safe_reply(interaction, content=f"```\n{stats}\n```", ephemeral=True)
 
     async def handle_reloadsounds(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
@@ -596,8 +612,10 @@ class MemeAdmin(commands.Cog):
             entrance_cog.reload_cache()
         audio_cache.cache.clear()
         preload_audio_clips()
-        await interaction.followup.send(
-            "✅ Beep and entrance sounds reloaded.", ephemeral=True
+        await safe_reply(
+            interaction,
+            content="✅ Beep and entrance sounds reloaded.",
+            ephemeral=True,
         )
 
 
