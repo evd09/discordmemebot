@@ -244,7 +244,7 @@ Subreddit management is handled through `/memeadmin` buttons or automatic refres
 | /nsfwmeme <keyword>       | Fetch a NSFW meme (NSFW channel required)                                  |
 | /r_ <subreddit> [keyword] | Fetch meme from a specific subreddit, optionally filtered by keyword       |
 | /dashboard                | Show meme and economy stats & leaderboards                                 |
-| /memeadmin                | Admin panel for ping, uptime, subreddit management, etc.                   |
+| /memeadmin                | Entry point for admin controls. See [Admin Workflow](#admin-workflow).     |
 | /balance                  | Check your coin balance                                                    |
 | /buy <item>               | Purchase a shop item                                                       |
 | /gamble [amount]          | Play flip, roll, high-low, slots, crash, blackjack, or the lottery         |
@@ -256,6 +256,14 @@ Subreddit management is handled through `/memeadmin` buttons or automatic refres
 | /myentrance   | Show your entrance file/volume          |
 | /beeps        | Play a random beep or choose one        |
 
+
+## Admin Workflow
+
+Use `/memeadmin` to open the administration panel and configure the bot.
+
+- Check bot status such as ping and uptime.
+- Manage subreddit lists and other server settings.
+- Reload entrance sounds or perform other maintenance tasks.
 
 ## 🎉 Contributing & Testing ##
 - Open issues or PRs for improvements.
