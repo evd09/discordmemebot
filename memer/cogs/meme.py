@@ -171,6 +171,7 @@ class Meme(commands.Cog):
             rand_sub = random.choice(all_subs)
             post = await simple_random_meme(self.reddit, rand_sub)
             if not post:
+                ctx._no_reward = True
                 return await ctx.interaction.followup.send(
                     "✅ No memes found—try again later!", ephemeral=True
                 )
@@ -204,6 +205,7 @@ class Meme(commands.Cog):
             log.info("✅ send_meme succeeded message_id=%s", sent.id)
         except Exception:
             log.exception("Error in send_meme")
+            ctx._no_reward = True
             return await ctx.interaction.followup.send(
                 "❌ Error sending meme.", ephemeral=True
             )
@@ -229,6 +231,7 @@ class Meme(commands.Cog):
 
         # ─── NSFW channel check ───────────────────────────────
         if not ctx.channel.is_nsfw():
+            ctx._no_reward = True
             return await ctx.interaction.response.send_message(
                 "🔞 You can only use NSFW memes in NSFW channels.",
                 ephemeral=True
@@ -290,6 +293,7 @@ class Meme(commands.Cog):
             log.info("✅ NSFW send_meme succeeded message_id=%s", sent.id)
         except Exception:
             log.exception("Error in send_meme")
+            ctx._no_reward = True
             return await ctx.interaction.followup.send(
                 "❌ Error sending NSFW meme.", ephemeral=True
             )
@@ -338,6 +342,7 @@ class Meme(commands.Cog):
                 post = await simple_random_meme(self.reddit, subreddit)
                 if not post:
                     log.info("No random meme found for r/%s, sending fail message.", subreddit)
+                    ctx._no_reward = True
                     return await ctx.followup.send(
                         f"✅ No memes found in r/{subreddit} right now—try again later!",
                         ephemeral=True
@@ -353,6 +358,7 @@ class Meme(commands.Cog):
                 post = None
 
             if not post:
+                ctx._no_reward = True
                 return await ctx.followup.send(
                     f"✅ No fresh posts in r/{subreddit} right now—try again later!",
                     ephemeral=True

@@ -202,8 +202,15 @@ class MemeAdmin(commands.Cog):
     async def handle_removesubreddit(
         self, interaction: discord.Interaction, name: str, category: str
     ):
+        if category not in ("sfw", "nsfw"):
+            await interaction.response.send_message(
+                "Category must be 'sfw' or 'nsfw'.", ephemeral=True
+            )
+            return
+
+        await interaction.response.defer(ephemeral=True)
         remove_guild_subreddit(interaction.guild.id, name, category)
-        await interaction.response.send_message(
+        await interaction.followup.send(
             f"✅ Removed `{name}` from the {category.upper()} subreddits list for this server.",
             ephemeral=True,
         )
