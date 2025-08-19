@@ -205,7 +205,7 @@ async def fetch_meme(
     subreddits: Sequence[Union[str, Subreddit]],
     cache_mgr,
     keyword: Optional[str] = None,
-    listings: Sequence[str] = ("hot", "new"),
+    listings: Sequence[str] = ("hot", "new", "top"),
     limit: int = 75,
     extract_fn=None,
     filters: Optional[Sequence[Callable[[Submission], bool]]] = None,
@@ -259,14 +259,14 @@ async def fetch_meme(
         sub_to_try = random.choice(subreddits)
         try:
             s_obj = await reddit.subreddit(sub_to_try)
-            for listing in listings:
-                async for post in _fetch_listing_with_retry(s_obj, listing, limit):
-                    if is_valid_post(post):
-                        data = extract_fn(post)
-                        posts.append(data)
-                        count += 1
-                        if random.randrange(count) == 0:
-                            chosen = data
+            listing_choice = random.choice(listings)
+            async for post in _fetch_listing_with_retry(s_obj, listing_choice, limit):
+                if is_valid_post(post):
+                    data = extract_fn(post)
+                    posts.append(data)
+                    count += 1
+                    if random.randrange(count) == 0:
+                        chosen = data
         except Exception:
             posts = []
 
@@ -301,11 +301,17 @@ async def fetch_meme(
             tried.append(name)
             try:
                 sub_obj = await reddit.subreddit(name)
-                for listing in listings:
-                    async for post in _fetch_listing_with_retry(sub_obj, listing, limit):
-                        if is_valid_post(post):
-                            data = extract_fn(post)
-                            return MemeResult(None, name, listing, tried, [], "fallback")
+                listing_choice = random.choice(listings)
+                count = 0
+                choice_post = None
+                async for post in _fetch_listing_with_retry(sub_obj, listing_choice, limit):
+                    if is_valid_post(post):
+                        count += 1
+                        if random.randrange(count) == 0:
+                            choice_post = post
+                if choice_post:
+                    data = extract_fn(choice_post)
+                    return MemeResult(None, name, listing_choice, tried, [], "fallback")
             except Exception:
                 continue
 
