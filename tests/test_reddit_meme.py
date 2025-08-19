@@ -135,7 +135,7 @@ def test_fetch_meme_supports_top_listing():
         )
     )
 
-    assert result.listing == "best"
+    assert result.listing == "top"
 
 
 def test_keyword_search_across_multiple_subreddits():
