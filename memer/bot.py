@@ -119,17 +119,15 @@ async def cleanup_all_voice(bot):
         except Exception as e:
             print(f"[STARTUP CLEANUP ERROR] {guild.name}: {e}")
 
-@bot.event
-async def on_ready() -> None:
-    await cleanup_all_voice(bot)
 
-    log.info(f"🚀 Logged in as {bot.user} (ID: {bot.user.id})")
-    log.info("Bot is in guilds: %s", [g.id for g in bot.guilds])
-    log.info("DEV_GUILD_ID = %s", DEV_GUILD_ID)
+async def sync_app_commands(bot: commands.Bot) -> None:
+    """Sync application commands globally and to the dev guild (if configured)."""
 
     # Diagnostic
     cmds = bot.tree.get_commands()
-    log.info("Found %d application commands to sync: %s", len(cmds), [c.name for c in cmds])
+    log.info(
+        "Found %d application commands to sync: %s", len(cmds), [c.name for c in cmds]
+    )
 
     # Clear all commands to avoid lingering/deprecated entries
     bot.tree.clear_commands(guild=None)
@@ -147,7 +145,9 @@ async def on_ready() -> None:
     try:
         if DEV_GUILD_ID:
             synced = await bot.tree.sync(guild=guild_obj)
-            log.info("✅ Synced %d commands to dev guild %s!", len(synced), DEV_GUILD_ID)
+            log.info(
+                "✅ Synced %d commands to dev guild %s!", len(synced), DEV_GUILD_ID
+            )
             synced = await bot.tree.sync()
             log.info("✅ Synced %d commands globally!", len(synced))
         else:
@@ -181,6 +181,16 @@ async def on_ready() -> None:
                     "Forbidden to fetch commands in dev guild %s; skipping",
                     DEV_GUILD_ID,
                 )
+
+@bot.event
+async def on_ready() -> None:
+    await cleanup_all_voice(bot)
+
+    log.info(f"🚀 Logged in as {bot.user} (ID: {bot.user.id})")
+    log.info("Bot is in guilds: %s", [g.id for g in bot.guilds])
+    log.info("DEV_GUILD_ID = %s", DEV_GUILD_ID)
+
+    await sync_app_commands(bot)
 
 
 async def main() -> None:
