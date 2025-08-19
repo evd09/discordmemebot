@@ -240,10 +240,12 @@ async def simple_random_meme(reddit: Reddit, subreddit_name: str) -> Optional[Su
         log.warning("Could not load r/%s: %s", subreddit_name, e)
         return None
 
+    want = subreddit_name.lower()
+
     # 1️⃣ Try the true random endpoint
     try:
         p = await sub.random()  # this will 400 on most subs
-        if p:
+        if p and getattr(getattr(p, "subreddit", None), "display_name", "").lower() == want:
             log.debug("simple_random_meme: got %s via .random() on r/%s", p.id, subreddit_name)
             return p
     except Exception as e:
@@ -255,6 +257,8 @@ async def simple_random_meme(reddit: Reddit, subreddit_name: str) -> Optional[Su
         count = 0
         choice = None
         async for p in _fetch_listing_with_retry(sub, "hot", limit=50):
+            if getattr(getattr(p, "subreddit", None), "display_name", "").lower() != want:
+                continue
             if getattr(p, "url", "").lower().endswith(_exts):
                 count += 1
                 if random.randrange(count) == 0:
