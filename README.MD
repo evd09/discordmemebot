@@ -139,6 +139,9 @@ BASE_REWARD=10
 KEYWORD_BONUS=5
 DAILY_BONUS=50
 
+# Logging level (optional)
+LOG_LEVEL=INFO                   # e.g. DEBUG, INFO, WARNING
+
 # Optional: audio cache limit
 MAX_CACHE_SIZE=100
 ```

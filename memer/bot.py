@@ -37,6 +37,7 @@ COIN_NAME    = os.getenv("COIN_NAME", "coins")
 BASE_REWARD  = int(os.getenv("BASE_REWARD", 10))
 KEYWORD_BONUS= int(os.getenv("KEYWORD_BONUS", 5))
 DAILY_BONUS  = int(os.getenv("DAILY_BONUS", 50))
+LOG_LEVEL    = getattr(logging, os.getenv("LOG_LEVEL", "INFO").upper(), logging.INFO)
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -73,9 +74,9 @@ bot.config = SimpleNamespace(
     MEME_CACHE=MEME_CACHE_CONFIG,
     DISABLE_GLOBAL_COMMANDS=DISABLE_GLOBAL_COMMANDS,
 )
-# Configure root logger: send to stdout, show INFO+ by default
+# Configure root logger: send to stdout; default INFO, override with LOG_LEVEL env
 logging.basicConfig(
-    level=logging.INFO,
+    level=LOG_LEVEL,
     format="%(asctime)s %(levelname)-8s %(name)-15s %(message)s",
 )
 
