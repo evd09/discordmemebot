@@ -182,10 +182,8 @@ class Meme(commands.Cog):
         # ─── BUILD EMBED ─────────────────────────────────────
         embed = Embed(
             title=post.title,
-            url=f"https://reddit.com{post.permalink}"
-        )
-        embed.set_footer(
-            text=f"r/{result.source_subreddit} • via {result.picked_via.upper()}"
+            url=f"https://reddit.com{post.permalink}",
+            description=f"r/{result.source_subreddit} • u/{post.author}"
         )
 
         raw_url   = get_image_url(post)
@@ -201,7 +199,7 @@ class Meme(commands.Cog):
             ctx._chosen_fallback = True
 
         try:
-            sent = await send_meme(ctx, url=raw_url, content=content)
+            sent = await send_meme(ctx, url=embed_url, content=content, embed=embed)
             log.info("✅ send_meme succeeded message_id=%s", sent.id)
         except Exception:
             log.exception("Error in send_meme")
@@ -269,10 +267,8 @@ class Meme(commands.Cog):
         # ─── BUILD EMBED ─────────────────────────────────────
         embed = Embed(
             title=post.title,
-            url=f"https://reddit.com{post.permalink}"
-        )
-        embed.set_footer(
-            text=f"r/{result.source_subreddit} • via {result.picked_via.upper()}"
+            url=f"https://reddit.com{post.permalink}",
+            description=f"r/{result.source_subreddit} • u/{post.author}"
         )
 
         raw_url   = get_image_url(post)
@@ -288,7 +284,7 @@ class Meme(commands.Cog):
             ctx._chosen_fallback = True
 
         try:
-            sent = await send_meme(ctx, url=raw_url, content=content)
+            sent = await send_meme(ctx, url=embed_url, content=content, embed=embed)
             log.info("✅ NSFW send_meme succeeded message_id=%s", sent.id)
         except Exception:
             log.exception("Error in send_meme")
