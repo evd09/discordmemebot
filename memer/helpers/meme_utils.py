@@ -45,11 +45,14 @@ async def send_meme(
         except discord.errors.NotFound:
             pass
 
-    try:
-        if getattr(ctx, "interaction", None):
+    if getattr(ctx, "interaction", None):
+        try:
             return await ctx.interaction.followup.send(content=text, embed=embed)
-    except discord.errors.NotFound:
-        pass
+        except discord.errors.NotFound:
+            log.warning("Interaction expired; falling back to channel.send")
+            if getattr(ctx, "channel", None):
+                return await ctx.channel.send(content=text, embed=embed)
+            return
 
     return await ctx.send(content=text, embed=embed)
 
