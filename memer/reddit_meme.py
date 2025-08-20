@@ -322,7 +322,6 @@ async def fetch_meme(
     is_async_extract = inspect.iscoroutinefunction(extract_fn)
 
     regex = keyword is not None
-    exclude_ids_set = set(exclude_ids or [])
     subreddit_names = {
         getattr(s, "display_name", str(s)).lower()
         for s in subreddits
@@ -350,10 +349,6 @@ async def fetch_meme(
         if not p or not getattr(p, "url", None):
             return False
         pid = getattr(p, "id", None)
-        if pid and pid in ID_CACHE:
-            return False
-        if exclude_ids_set and pid in exclude_ids_set:
-            return False
         url = getattr(p, "url", None)
         if url and url in HASH_CACHE:
             return False
@@ -377,7 +372,6 @@ async def fetch_meme(
                 p
                 for p in posts
                 if p.get("media_url")
-                and p.get("post_id") not in exclude_ids_set
                 and p.get("subreddit", "").lower() in subreddit_names
             ]
             if valid:
@@ -389,7 +383,6 @@ async def fetch_meme(
                     id = chosen["post_id"]
                     author = chosen.get("author") or "[deleted]"
 
-                ID_CACHE[chosen["post_id"]] = True
                 if chosen.get("media_url"):
                     HASH_CACHE[chosen["media_url"]] = True
                 return MemeResult(
@@ -409,7 +402,6 @@ async def fetch_meme(
                 p
                 for p in posts
                 if p.get("media_url")
-                and p.get("post_id") not in exclude_ids_set
                 and p.get("subreddit", "").lower() in subreddit_names
             ]
             if valid:
@@ -421,7 +413,6 @@ async def fetch_meme(
                     id = chosen["post_id"]
                     author = chosen.get("author") or "[deleted]"
 
-                ID_CACHE[chosen["post_id"]] = True
                 if chosen.get("media_url"):
                     HASH_CACHE[chosen["media_url"]] = True
                 return MemeResult(
@@ -481,8 +472,6 @@ async def fetch_meme(
             cache_mgr.cache_to_ram(keyword, cache_posts, nsfw=nsfw)
             await cache_mgr.save_to_disk(keyword, cache_posts, nsfw=nsfw)
             chosen_post, chosen_data = random.choice(posts)
-            if getattr(chosen_post, "id", None):
-                ID_CACHE[chosen_post.id] = True
             url = getattr(chosen_post, "url", None)
             if url:
                 HASH_CACHE[url] = True
@@ -517,8 +506,6 @@ async def fetch_meme(
             p
             for p in combined_random
             if p.get("media_url")
-            and p.get("post_id") not in exclude_ids_set
-            and p.get("post_id") not in ID_CACHE
             and p.get("media_url") not in HASH_CACHE
         ]
         if valid:
@@ -530,7 +517,6 @@ async def fetch_meme(
                 id = chosen["post_id"]
                 author = chosen.get("author") or "[deleted]"
 
-            ID_CACHE[chosen["post_id"]] = True
             if chosen.get("media_url"):
                 HASH_CACHE[chosen["media_url"]] = True
             source_listing = "cache_ram" if chosen["post_id"] in ram_random_ids else "cache_disk"
@@ -559,8 +545,6 @@ async def fetch_meme(
                             existing_rand.append(data)
                         cache_mgr.cache_to_ram(RAND_SENTINEL, existing_rand, nsfw=nsfw)
                         await cache_mgr.save_to_disk(RAND_SENTINEL, [data], nsfw=nsfw)
-                        if getattr(post, "id", None):
-                            ID_CACHE[post.id] = True
                         url = getattr(post, "url", None)
                         if url:
                             HASH_CACHE[url] = True
@@ -589,8 +573,6 @@ async def fetch_meme(
                     existing_rand.append(data)
                 cache_mgr.cache_to_ram(RAND_SENTINEL, existing_rand, nsfw=nsfw)
                 await cache_mgr.save_to_disk(RAND_SENTINEL, [data], nsfw=nsfw)
-                if getattr(choice_post, "id", None):
-                    ID_CACHE[choice_post.id] = True
                 url = getattr(choice_post, "url", None)
                 if url:
                     HASH_CACHE[url] = True
@@ -609,8 +591,6 @@ async def fetch_meme(
             existing_rand.append(data)
         cache_mgr.cache_to_ram(RAND_SENTINEL, existing_rand, nsfw=nsfw)
         await cache_mgr.save_to_disk(RAND_SENTINEL, [data], nsfw=nsfw)
-        if getattr(post, "id", None):
-            ID_CACHE[post.id] = True
         url = getattr(post, "url", None)
         if url:
             HASH_CACHE[url] = True

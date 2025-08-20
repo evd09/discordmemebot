@@ -528,7 +528,8 @@ class Meme(commands.Cog):
         # 3) Fetch via pipeline (or random fallback)
         post = None
         try:
-            recent_ids = await get_recent_post_ids(ctx.channel.id, limit=20)
+            # recent_ids = await get_recent_post_ids(ctx.channel.id, limit=20)
+            recent_ids = []
 
             if keyword is None:
                 try:
@@ -542,13 +543,7 @@ class Meme(commands.Cog):
                 result.source_subreddit = subreddit
                 result.picked_via = "random"
             else:
-                category = "nsfw" if getattr(sub, "over18", False) else "sfw"
-                loaded = [s.lower() for s in get_guild_subreddits(ctx.guild.id, category)]
-                use_cache = subreddit.lower() in loaded
-                if use_cache and getattr(self.cache_service, "cache_mgr", None):
-                    cache_mgr = _AlwaysOnCacheManager(self.cache_service.cache_mgr)
-                else:
-                    cache_mgr = NoopCacheManager()
+                cache_mgr = NoopCacheManager()
 
                 result = await fetch_meme_util(
                     reddit=self.reddit,
@@ -556,7 +551,6 @@ class Meme(commands.Cog):
                     keyword=keyword,
                     cache_mgr=cache_mgr,
                     nsfw=bool(getattr(sub, "over18", False)),
-                    exclude_ids=recent_ids,
                 )
                 post = getattr(result, "post", None) if result else None
 
