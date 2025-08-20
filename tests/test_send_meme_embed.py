@@ -12,11 +12,11 @@ from memer.helpers.meme_utils import send_meme
 
 class DummyCtx:
     def __init__(self):
-        self.sent = None
+        self.sends = []
         self.interaction = None
 
     async def send(self, content=None, embed=None):
-        self.sent = (content, embed)
+        self.sends.append((content, embed))
         return SimpleNamespace(id=123)
 
 
@@ -26,7 +26,8 @@ def test_send_meme_handles_query_params_for_images():
     url = "https://example.com/image.png?width=200&height=200"
     asyncio.run(send_meme(ctx, url=url, embed=embed))
 
-    content, returned_embed = ctx.sent
+    assert len(ctx.sends) == 1
+    content, returned_embed = ctx.sends[0]
     assert content is None
     assert returned_embed is embed
     assert embed.image.url == url

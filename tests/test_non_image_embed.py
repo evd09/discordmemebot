@@ -30,13 +30,13 @@ class DummyCtx:
         self.author = SimpleNamespace(id=2)
         self.channel = SimpleNamespace(id=3, is_nsfw=lambda: nsfw)
         self.interaction = None
-        self.sent = None
+        self.sends = []
 
     async def defer(self):
         pass
 
     async def send(self, content=None, embed=None):
-        self.sent = (content, embed)
+        self.sends.append((content, embed))
         return SimpleNamespace(id=123)
 
 
@@ -73,10 +73,12 @@ def test_meme_non_image_includes_embed_and_media_url(monkeypatch):
 
     ctx = DummyCtx()
     asyncio.run(Meme.meme(meme_cog, ctx))
-
-    content, embed = ctx.sent
-    assert content == MEDIA_URL
-    assert embed.url == f"https://reddit.com{PERMALINK}"
+    assert len(ctx.sends) == 2
+    (content1, embed1), (content2, embed2) = ctx.sends
+    assert content1 is None
+    assert embed1.url == f"https://reddit.com{PERMALINK}"
+    assert content2 == MEDIA_URL
+    assert embed2 is None
 
 
 def test_nsfwmeme_non_image_includes_embed_and_media_url(monkeypatch):
@@ -94,10 +96,12 @@ def test_nsfwmeme_non_image_includes_embed_and_media_url(monkeypatch):
 
     ctx = DummyCtx(nsfw=True)
     asyncio.run(Meme.nsfwmeme(meme_cog, ctx))
-
-    content, embed = ctx.sent
-    assert content == MEDIA_URL
-    assert embed.url == f"https://reddit.com{PERMALINK}"
+    assert len(ctx.sends) == 2
+    (content1, embed1), (content2, embed2) = ctx.sends
+    assert content1 is None
+    assert embed1.url == f"https://reddit.com{PERMALINK}"
+    assert content2 == MEDIA_URL
+    assert embed2 is None
 
 
 def test_r_non_image_includes_embed_and_media_url(monkeypatch):
@@ -118,7 +122,9 @@ def test_r_non_image_includes_embed_and_media_url(monkeypatch):
 
     ctx = DummyCtx()
     asyncio.run(Meme.r_(meme_cog, ctx, "testsub"))
-
-    content, embed = ctx.sent
-    assert content == f"Random pick 🎲\n{MEDIA_URL}"
-    assert embed.url == f"https://reddit.com{PERMALINK}"
+    assert len(ctx.sends) == 2
+    (content1, embed1), (content2, embed2) = ctx.sends
+    assert content1 == "Random pick 🎲"
+    assert embed1.url == f"https://reddit.com{PERMALINK}"
+    assert content2 == MEDIA_URL
+    assert embed2 is None
