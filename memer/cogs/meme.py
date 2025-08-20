@@ -38,6 +38,21 @@ from memer.helpers.meme_utils import (
 from memer.helpers.meme_cache_service import MemeCacheService
 from memer.helpers.db import get_recent_post_ids, register_meme_message
 from memer.helpers.reddit_cache import NoopCacheManager
+# Adapter to keep keywords active during subreddit searches
+class _AlwaysOnCacheManager:
+    """Wraps an existing cache manager but never disables keywords."""
+
+    def __init__(self, inner):
+        self.inner = inner
+
+    def __getattr__(self, name):
+        return getattr(self.inner, name)
+
+    def is_disabled(self, *args, **kwargs):  # pragma: no cover - simple override
+        return False
+
+    def record_failure(self, *args, **kwargs):  # pragma: no cover - no-op
+        return False
 # Refactored utilities and cache
 from memer.reddit_meme import (
     fetch_meme      as fetch_meme_util,
@@ -530,11 +545,10 @@ class Meme(commands.Cog):
                 category = "nsfw" if getattr(sub, "over18", False) else "sfw"
                 loaded = [s.lower() for s in get_guild_subreddits(ctx.guild.id, category)]
                 use_cache = subreddit.lower() in loaded
-                cache_mgr = (
-                    self.cache_service.cache_mgr
-                    if use_cache and getattr(self.cache_service, "cache_mgr", None)
-                    else NoopCacheManager()
-                )
+                if use_cache and getattr(self.cache_service, "cache_mgr", None):
+                    cache_mgr = _AlwaysOnCacheManager(self.cache_service.cache_mgr)
+                else:
+                    cache_mgr = NoopCacheManager()
 
                 result = await fetch_meme_util(
                     reddit=self.reddit,
