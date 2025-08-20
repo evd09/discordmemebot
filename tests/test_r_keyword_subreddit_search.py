@@ -85,6 +85,7 @@ def test_r_keyword_uses_subreddit_search(monkeypatch):
             "title": post.title,
             "url": post.url,
             "media_url": post.url,
+            "permalink": post.permalink,
             "author": post.author,
         }
         res = await real_fetch_meme(**kwargs)
