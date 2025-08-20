@@ -18,23 +18,28 @@ async def send_meme(
     *,
     content: Optional[str] = None,
     embed: Optional[Embed] = None,
-):
+): 
     """Send a meme to Discord.
 
     Images are sent as an embed with the image attached. For other URLs
-    (e.g., videos), the URL is included in the message content so Discord
-    can generate its own preview.
+    (e.g., videos), if an embed is provided it is sent first with the Reddit
+    link, followed by the media URL in a separate message so Discord can
+    generate a preview. If no embed is supplied, the URL is included in the
+    message content so Discord can generate its own preview.
     """
     # Some Reddit image URLs include query parameters (e.g. ``.jpg?width=640``)
     # which would cause a simple ``endswith`` check to fail. Parse the URL and
     # inspect only the path so such URLs are still treated as images.
     is_image = urlparse(url).path.lower().endswith(IMAGE_EXT)
 
-    # If this is an image, attach it to the embed; otherwise, fall back to
-    # sending the URL directly so Discord can unfurl videos/gifs while keeping
-    # the embed (which links back to Reddit).
+    # If this is an image, attach it to the embed. For non-image posts with an
+    # embed, the embed is sent first followed by the media URL in a second
+    # message. Otherwise fall back to sending the URL directly so Discord can
+    # unfurl videos/gifs while keeping the embed (which links back to Reddit).
     if embed and is_image:
         embed.set_image(url=url)
+        text = content
+    elif embed and not is_image:
         text = content
     else:
         # Include the media URL in the message content so Discord can preview
@@ -46,6 +51,28 @@ async def send_meme(
             await ctx.interaction.response.defer()
         except discord.errors.NotFound:
             pass
+
+    if embed and not is_image:
+        if getattr(ctx, "interaction", None):
+            try:
+                sent = await ctx.interaction.followup.send(content=text, embed=embed)
+            except discord.errors.NotFound:
+                log.warning("Interaction expired; falling back to channel.send")
+                if getattr(ctx, "channel", None):
+                    sent = await ctx.channel.send(content=text, embed=embed)
+                else:
+                    return
+            try:
+                await ctx.interaction.followup.send(content=url)
+            except discord.errors.NotFound:
+                log.warning("Interaction expired; falling back to channel.send for media url")
+                if getattr(ctx, "channel", None):
+                    await ctx.channel.send(content=url)
+            return sent
+        else:
+            sent = await ctx.send(content=text, embed=embed)
+            await ctx.send(content=url)
+            return sent
 
     if getattr(ctx, "interaction", None):
         try:
