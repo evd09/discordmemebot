@@ -31,3 +31,17 @@ def test_send_meme_handles_query_params_for_images():
     assert content is None
     assert returned_embed is embed
     assert embed.image.url == url
+
+
+def test_send_meme_non_image_sends_embed_then_url():
+    ctx = DummyCtx()
+    embed = Embed(title="test")
+    url = "https://v.redd.it/video"
+    asyncio.run(send_meme(ctx, url=url, embed=embed))
+
+    assert len(ctx.sends) == 2
+    (content1, embed1), (content2, embed2) = ctx.sends
+    assert content1 is None
+    assert embed1 is embed
+    assert content2 == url
+    assert embed2 is None
