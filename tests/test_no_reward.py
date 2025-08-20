@@ -36,6 +36,29 @@ def test_nsfwmeme_in_sfw_channel_sets_no_reward():
     asyncio.run(Meme.nsfwmeme(meme_cog, ctx))
     assert getattr(ctx, "_no_reward", False) is True
 
+
+def test_r_blocks_nsfw_subreddit_in_sfw_channel():
+    meme_cog = Meme.__new__(Meme)
+    async def fake_subreddit(name, fetch=True):
+        return SimpleNamespace(display_name=name, over18=True)
+
+    meme_cog.reddit = SimpleNamespace(subreddit=fake_subreddit)
+
+    ctx = SimpleNamespace(
+        guild=SimpleNamespace(id=1),
+        author=SimpleNamespace(id=2),
+        channel=SimpleNamespace(is_nsfw=lambda: False),
+        interaction=DummyInteraction(),
+    )
+
+    async def fake_defer():
+        pass
+
+    ctx.defer = fake_defer
+
+    asyncio.run(Meme.r_(meme_cog, ctx, "python"))
+    assert getattr(ctx, "_no_reward", False) is True
+
 def test_meme_uses_local_fallback_when_no_posts(monkeypatch):
     meme_cog = Meme.__new__(Meme)
 

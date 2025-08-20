@@ -497,6 +497,19 @@ class Meme(commands.Cog):
                 )
             return await ctx.send(f"r/{subreddit} is not available :/")
 
+        # 2a) NSFW channel check if subreddit is marked NSFW
+        if getattr(sub, "over18", False):
+            channel_is_nsfw = getattr(ctx.channel, "is_nsfw", lambda: True)()
+            if not channel_is_nsfw:
+                ctx._no_reward = True
+                msg = (
+                    f"🔞 Heads up - r/{subreddit} is NSFW. "
+                    "Move to an NSFW channel and retry."
+                )
+                if ctx.interaction:
+                    return await ctx.interaction.followup.send(msg, ephemeral=True)
+                return await ctx.send(msg)
+
         # 3) Fetch via pipeline (or random fallback)
         post = None
         try:
