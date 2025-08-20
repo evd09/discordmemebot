@@ -499,33 +499,10 @@ class Meme(commands.Cog):
 
         # 3) Fetch via pipeline (or random fallback)
         post = None
-        random_fallback = False
-
         try:
             recent_ids = await get_recent_post_ids(ctx.channel.id, limit=20)
 
-            category = "nsfw" if getattr(sub, "over18", False) else "sfw"
-            loaded = [s.lower() for s in get_guild_subreddits(ctx.guild.id, category)]
-            use_cache = subreddit.lower() in loaded
-            cache_mgr = (
-                self.cache_service.cache_mgr
-                if use_cache and getattr(self.cache_service, "cache_mgr", None)
-                else NoopCacheManager()
-            )
-
-            result = await fetch_meme_util(
-                reddit=self.reddit,
-                subreddits=[sub],
-                keyword=keyword,
-                cache_mgr=cache_mgr,
-                nsfw=bool(getattr(sub, "over18", False)),
-                exclude_ids=recent_ids,
-            )
-            post = getattr(result, "post", None) if result else None
-
-            # If nothing found, do a true random fallback from that subreddit
-            if not post:
-                log.info("No post found via keyword, trying random fallback in r/%s", subreddit)
+            if keyword is None:
                 try:
                     post = await simple_random_meme(self.reddit, subreddit)
                 except SubredditUnavailableError:
@@ -533,20 +510,51 @@ class Meme(commands.Cog):
                     if ctx.interaction:
                         return await ctx.interaction.followup.send(msg, ephemeral=True)
                     return await ctx.send(msg)
-                if not post:
-                    log.info("No random meme found for r/%s, sending fail message.", subreddit)
-                    if ctx.interaction:
-                        return await ctx.interaction.followup.send(
-                            f"✅ No memes found in r/{subreddit} right now—try again later!",
-                            ephemeral=True
-                        )
-                    return await ctx.send(
-                        f"✅ No memes found in r/{subreddit} right now—try again later!"
-                    )
-                # Build a result-like object for footer display
                 result = type("F", (), {})()
                 result.source_subreddit = subreddit
-                result.picked_via       = "random"
+                result.picked_via = "random"
+            else:
+                category = "nsfw" if getattr(sub, "over18", False) else "sfw"
+                loaded = [s.lower() for s in get_guild_subreddits(ctx.guild.id, category)]
+                use_cache = subreddit.lower() in loaded
+                cache_mgr = (
+                    self.cache_service.cache_mgr
+                    if use_cache and getattr(self.cache_service, "cache_mgr", None)
+                    else NoopCacheManager()
+                )
+
+                result = await fetch_meme_util(
+                    reddit=self.reddit,
+                    subreddits=[sub],
+                    keyword=keyword,
+                    cache_mgr=cache_mgr,
+                    nsfw=bool(getattr(sub, "over18", False)),
+                    exclude_ids=recent_ids,
+                )
+                post = getattr(result, "post", None) if result else None
+
+                if not post:
+                    log.info("No post found via keyword, trying random fallback in r/%s", subreddit)
+                    try:
+                        post = await simple_random_meme(self.reddit, subreddit)
+                    except SubredditUnavailableError:
+                        msg = f"r/{subreddit} is not available :/"
+                        if ctx.interaction:
+                            return await ctx.interaction.followup.send(msg, ephemeral=True)
+                        return await ctx.send(msg)
+                    if not post:
+                        log.info("No random meme found for r/%s, sending fail message.", subreddit)
+                        if ctx.interaction:
+                            return await ctx.interaction.followup.send(
+                                f"✅ No memes found in r/{subreddit} right now—try again later!",
+                                ephemeral=True
+                            )
+                        return await ctx.send(
+                            f"✅ No memes found in r/{subreddit} right now—try again later!"
+                        )
+                    result = type("F", (), {})()
+                    result.source_subreddit = subreddit
+                    result.picked_via = "random"
 
             attempts = 0
             while post and post.id in recent_ids and attempts < 5:
@@ -598,8 +606,10 @@ class Meme(commands.Cog):
             embed.set_footer(text=f"via {result.picked_via.upper()}")
 
             content = None
-            if getattr(result, "picked_via", None) == "random":
-                content = "here is a random one (random fallback)"
+            if keyword is None:
+                content = "Random pick 🎲"
+            elif getattr(result, "picked_via", None) == "random":
+                content = f"No results for {keyword}; serving a random one."
 
             sent = await send_meme(
                 ctx,
