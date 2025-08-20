@@ -54,6 +54,18 @@ async def init() -> None:
         )
         await _conn.execute(
             """
+              DELETE FROM meme_messages
+              WHERE post_id IS NOT NULL
+                AND rowid NOT IN (
+                  SELECT MIN(rowid)
+                  FROM meme_messages
+                  WHERE post_id IS NOT NULL
+                  GROUP BY channel_id, post_id
+                )
+            """
+        )
+        await _conn.execute(
+            """
               CREATE UNIQUE INDEX IF NOT EXISTS idx_channel_post
               ON meme_messages(channel_id, post_id)
             """
