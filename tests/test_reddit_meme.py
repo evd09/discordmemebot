@@ -81,7 +81,12 @@ def test_keyword_filter_accepts_only_matching_posts():
             keyword="cat",
             listings=("hot",),
             limit=10,
-            extract_fn=lambda p: {"title": p.title, "media_url": "url", "subreddit": "testsub"},
+            extract_fn=lambda p: {
+                "title": p.title,
+                "media_url": "url",
+                "subreddit": "testsub",
+                "permalink": f"/r/{p.subreddit.display_name}/comments/{p.id}/",
+            },
         )
     )
 
@@ -107,7 +112,12 @@ def test_keyword_filter_rejects_non_matching_posts():
             keyword="cat",
             listings=("hot",),
             limit=10,
-            extract_fn=lambda p: {"title": p.title, "media_url": "url", "subreddit": "testsub"},
+            extract_fn=lambda p: {
+                "title": p.title,
+                "media_url": "url",
+                "subreddit": "testsub",
+                "permalink": f"/r/{p.subreddit.display_name}/comments/{p.id}/",
+            },
         )
     )
 
@@ -134,6 +144,7 @@ def test_fetch_meme_supports_top_listing():
                 "title": p.title,
                 "media_url": "url",
                 "subreddit": "testsub",
+                "permalink": f"/r/{p.subreddit.display_name}/comments/{p.id}/",
             },
         )
     )
@@ -159,7 +170,12 @@ def test_keyword_search_across_multiple_subreddits():
             keyword="cat",
             listings=("hot",),
             limit=10,
-            extract_fn=lambda p: {"title": p.title, "media_url": "url", "subreddit": p.subreddit.display_name},
+            extract_fn=lambda p: {
+                "title": p.title,
+                "media_url": "url",
+                "subreddit": p.subreddit.display_name,
+                "permalink": f"/r/{p.subreddit.display_name}/comments/{p.id}/",
+            },
         )
     )
 
@@ -184,7 +200,12 @@ def test_fetch_meme_excludes_ids():
 
     def extract_fn(p):
         chosen.append(p.id)
-        return {"title": p.title, "media_url": "url", "subreddit": "testsub"}
+        return {
+            "title": p.title,
+            "media_url": "url",
+            "subreddit": "testsub",
+            "permalink": f"/r/{p.subreddit.display_name}/comments/{p.id}/",
+        }
 
     asyncio.run(
         fetch_meme(
@@ -242,7 +263,12 @@ def test_keyword_iterates_listings_sequentially():
             keyword="cat",
             listings=("hot", "top"),
             limit=10,
-            extract_fn=lambda p: {"title": p.title, "media_url": "url", "subreddit": "testsub"},
+            extract_fn=lambda p: {
+                "title": p.title,
+                "media_url": "url",
+                "subreddit": "testsub",
+                "permalink": f"/r/{p.subreddit.display_name}/comments/{p.id}/",
+            },
         )
     )
 

@@ -5,6 +5,7 @@
     "title": "Local NSFW Meme",
     "url": "https://example.com/nsfw1.jpg",
     "media_url": "https://example.com/nsfw1.jpg",
-    "author": "local"
+    "author": "local",
+    "permalink": "/r/localnsfwmeme/comments/local_nsfw_1"
   }
 ]

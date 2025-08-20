@@ -166,6 +166,7 @@ async def extract_post_data(post):
         "title": post.title,
         "url": post.url,
         "media_url": media_url,
+        "permalink": post.permalink,
         "author": str(post.author) if post.author else "[deleted]",
         "is_nsfw": post.over_18,
         "created_utc": int(post.created_utc),

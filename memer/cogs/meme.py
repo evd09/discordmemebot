@@ -137,11 +137,7 @@ class Meme(commands.Cog):
         ``via`` documents where the meme came from (e.g. ``RAM``, ``DISK``,
         ``WARM CACHE`` or ``LOCAL``).
         """
-        # figure out a permalink
-        permalink = post_dict.get("permalink")
-        if not permalink:
-            # e.g. /r/memes/comments/abcd1234
-            permalink = f"/r/{post_dict['subreddit']}/comments/{post_dict['post_id']}"
+        permalink = post_dict["permalink"]
         
         # 1️⃣ Build embed
         embed = Embed(
