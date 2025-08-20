@@ -32,6 +32,8 @@ discord_stub = types.ModuleType("discord")
 class Embed:
     def __init__(self, **kwargs):
         self.title = kwargs.get("title")
+        self.url = kwargs.get("url")
+        self.description = kwargs.get("description")
         self.image = SimpleNamespace(url=None)
         self.footer = SimpleNamespace(text=None)
 
