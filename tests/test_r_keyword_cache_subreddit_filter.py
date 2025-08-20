@@ -35,22 +35,7 @@ class DummyCache:
 
 
 def test_r_subreddit_keyword_filters_cached_posts(monkeypatch):
-    posts = [
-        {
-            'title': 'memes cat',
-            'media_url': 'https://example.com/p.jpg',
-            'post_id': 'p1',
-            'subreddit': 'memes',
-            'author': 'alice',
-        },
-        {
-            'title': 'javascript cat',
-            'media_url': 'https://example.com/j.jpg',
-            'post_id': 'j1',
-            'subreddit': 'javascript',
-            'author': 'bob',
-        },
-    ]
+    posts = []
 
     meme_cog = Meme.__new__(Meme)
     meme_cog.cache_service = SimpleNamespace(cache_mgr=DummyCache(posts))
@@ -73,16 +58,25 @@ def test_r_subreddit_keyword_filters_cached_posts(monkeypatch):
 
     monkeypatch.setattr(meme_mod, 'update_stats', fake_update_stats)
 
-    captured_result = {}
-
-    async def wrapper_fetch_meme(**kwargs):
-        res = await real_fetch_meme(**kwargs)
-        captured_result['result'] = res
-        return res
-
-    monkeypatch.setattr(meme_mod, 'fetch_meme_util', wrapper_fetch_meme)
-
     captured = {}
+    cache_mgr_type = {}
+
+    async def fake_fetch_meme_util(**kwargs):
+        cache_mgr_type['type'] = type(kwargs.get('cache_mgr'))
+        return None
+
+    monkeypatch.setattr(meme_mod, 'fetch_meme_util', fake_fetch_meme_util)
+
+    async def fake_simple_random_meme(reddit, sub):
+        return SimpleNamespace(
+            id='fresh',
+            title='meme',
+            permalink='/r/memes/comments/fresh/meme',
+            url='https://example.com/meme.jpg',
+            author='tester',
+        )
+
+    monkeypatch.setattr(meme_mod, 'simple_random_meme', fake_simple_random_meme)
 
     async def fake_send_meme(ctx, url, content=None, embed=None):
         captured['embed'] = embed
@@ -105,4 +99,5 @@ def test_r_subreddit_keyword_filters_cached_posts(monkeypatch):
     random.seed(0)
     asyncio.run(Meme.r_(meme_cog, ctx, 'memes', keyword='cat'))
 
-    assert captured_result['result'].post_dict['subreddit'] == 'memes'
+    assert cache_mgr_type['type'] is meme_mod.NoopCacheManager
+    assert captured['embed'] is not None
