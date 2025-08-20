@@ -216,23 +216,10 @@ class Meme(commands.Cog):
         except discord.errors.NotFound:
             pass
 
-        # ─── Recent IDs & pipeline fetch ─────────────────────
+        # ─── Recent IDs & initial fetch ──────────────────────
         recent_ids = await get_recent_post_ids(ctx.channel.id, limit=20)
-        result = await fetch_meme_util(
-            reddit=self.reddit,
-            subreddits=get_guild_subreddits(ctx.guild.id, "sfw"),
-            cache_mgr=self.cache_service.cache_mgr,
-            keyword=keyword,
-            nsfw=False,
-            exclude_ids=recent_ids,
-        )
-        post = getattr(result, "post", None)
 
-        # did we actually find something via keyword?
-        got_keyword = bool(keyword and result.picked_via in ("cache", "live"))
-
-        # ─── Final fallback: truly random ────────────────────
-        if not post:
+        if keyword is None:
             all_subs = get_guild_subreddits(ctx.guild.id, "sfw")
             rand_sub = random.choice(all_subs)
             try:
@@ -246,10 +233,39 @@ class Meme(commands.Cog):
                 return await ctx.interaction.followup.send(
                     "✅ No memes found—try again later!", ephemeral=True
                 )
-            # fake a result object for footer
             result = type("F", (), {})()
             result.source_subreddit = rand_sub
-            result.picked_via       = "random"
+            result.picked_via = "random"
+            got_keyword = False
+        else:
+            result = await fetch_meme_util(
+                reddit=self.reddit,
+                subreddits=get_guild_subreddits(ctx.guild.id, "sfw"),
+                cache_mgr=self.cache_service.cache_mgr,
+                keyword=keyword,
+                nsfw=False,
+                exclude_ids=recent_ids,
+            )
+            post = getattr(result, "post", None)
+            got_keyword = bool(keyword and result.picked_via in ("cache", "live"))
+
+            if not post:
+                all_subs = get_guild_subreddits(ctx.guild.id, "sfw")
+                rand_sub = random.choice(all_subs)
+                try:
+                    post = await simple_random_meme(self.reddit, rand_sub)
+                except SubredditUnavailableError:
+                    post = None
+                if not post:
+                    if await self._try_cache_or_local(ctx, nsfw=False, keyword=keyword):
+                        return
+                    ctx._no_reward = True
+                    return await ctx.interaction.followup.send(
+                        "✅ No memes found—try again later!", ephemeral=True
+                    )
+                result = type("F", (), {})()
+                result.source_subreddit = rand_sub
+                result.picked_via = "random"
 
         # ─── Avoid recently sent posts ─────────────────────
         attempts = 0
@@ -294,10 +310,7 @@ class Meme(commands.Cog):
         # only apologize if they asked for keyword but got no hits
         content = None
         if keyword and not got_keyword:
-            content = (
-                f"🔍 Sorry, I couldn’t find any memes containing `{keyword}`—"
-                " here is a random one (random fallback)"
-            )
+            content = f"No results for {keyword}; serving a random one."
             ctx._chosen_fallback = True
 
         try:
