@@ -31,14 +31,15 @@ async def send_meme(
     is_image = urlparse(url).path.lower().endswith(IMAGE_EXT)
 
     # If this is an image, attach it to the embed; otherwise, fall back to
-    # sending the URL directly so Discord can unfurl videos/gifs.
+    # sending the URL directly so Discord can unfurl videos/gifs while keeping
+    # the embed (which links back to Reddit).
     if embed and is_image:
         embed.set_image(url=url)
         text = content
     else:
+        # Include the media URL in the message content so Discord can preview
+        # videos/gifs, but still send the embed with the Reddit link.
         text = f"{content}\n{url}" if content else url
-        if not is_image:
-            embed = None
 
     if getattr(ctx, "interaction", None) and not ctx.interaction.response.is_done():
         try:
