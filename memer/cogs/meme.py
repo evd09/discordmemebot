@@ -36,7 +36,11 @@ from memer.helpers.meme_utils import (
     extract_post_data,
 )
 from memer.helpers.meme_cache_service import MemeCacheService
-from memer.helpers.db import get_recent_post_ids, register_meme_message
+from memer.helpers.db import (
+    get_recent_post_ids,
+    register_meme_message,
+    has_post_been_sent,
+)
 from memer.helpers.reddit_cache import NoopCacheManager
 # Adapter to keep keywords active during subreddit searches
 class _AlwaysOnCacheManager:
@@ -232,7 +236,7 @@ class Meme(commands.Cog):
             pass
 
         # ─── Recent IDs & initial fetch ──────────────────────
-        recent_ids = await get_recent_post_ids(ctx.channel.id, limit=20)
+        recent_ids = await get_recent_post_ids(ctx.channel.id)
 
         if keyword is None:
             all_subs = get_guild_subreddits(ctx.guild.id, "sfw")
@@ -285,7 +289,9 @@ class Meme(commands.Cog):
         # ─── Avoid recently sent posts ─────────────────────
         attempts = 0
         all_subs = get_guild_subreddits(ctx.guild.id, "sfw")
-        while post and post.id in recent_ids and attempts < 5:
+        while post and (
+            post.id in recent_ids or await has_post_been_sent(ctx.channel.id, post.id)
+        ) and attempts < 5:
             rand_sub = random.choice(all_subs)
             try:
                 post = await simple_random_meme(self.reddit, rand_sub)
@@ -297,7 +303,7 @@ class Meme(commands.Cog):
             result.source_subreddit = rand_sub
             result.picked_via = "random"
             attempts += 1
-        if not post or post.id in recent_ids:
+        if not post or post.id in recent_ids or await has_post_been_sent(ctx.channel.id, post.id):
             if await self._try_cache_or_local(ctx, nsfw=False, keyword=keyword):
                 return
             ctx._no_reward = True
@@ -372,7 +378,7 @@ class Meme(commands.Cog):
             pass
 
         # ─── Recent IDs & initial fetch ──────────────────────
-        recent_ids = await get_recent_post_ids(ctx.channel.id, limit=20)
+        recent_ids = await get_recent_post_ids(ctx.channel.id)
 
         if keyword is None:
             all_subs = get_guild_subreddits(ctx.guild.id, "nsfw")
@@ -426,7 +432,9 @@ class Meme(commands.Cog):
         # ─── Avoid recently sent posts ─────────────────────
         attempts = 0
         all_subs = get_guild_subreddits(ctx.guild.id, "nsfw")
-        while post and post.id in recent_ids and attempts < 5:
+        while post and (
+            post.id in recent_ids or await has_post_been_sent(ctx.channel.id, post.id)
+        ) and attempts < 5:
             rand_sub = random.choice(all_subs)
             try:
                 post = await simple_random_meme(self.reddit, rand_sub)
@@ -438,7 +446,7 @@ class Meme(commands.Cog):
             result.source_subreddit = rand_sub
             result.picked_via = "random"
             attempts += 1
-        if not post or post.id in recent_ids:
+        if not post or post.id in recent_ids or await has_post_been_sent(ctx.channel.id, post.id):
             if await self._try_cache_or_local(ctx, nsfw=True, keyword=keyword):
                 return
             ctx._no_reward = True
@@ -528,8 +536,7 @@ class Meme(commands.Cog):
         # 3) Fetch via pipeline (or random fallback)
         post = None
         try:
-            # recent_ids = await get_recent_post_ids(ctx.channel.id, limit=20)
-            recent_ids = []
+            recent_ids = await get_recent_post_ids(ctx.channel.id)
 
             if keyword is None:
                 try:
@@ -551,6 +558,7 @@ class Meme(commands.Cog):
                     keyword=keyword,
                     cache_mgr=cache_mgr,
                     nsfw=bool(getattr(sub, "over18", False)),
+                    exclude_ids=recent_ids,
                 )
                 post = getattr(result, "post", None) if result else None
 
@@ -578,7 +586,9 @@ class Meme(commands.Cog):
                     result.picked_via = "random"
 
             attempts = 0
-            while post and post.id in recent_ids and attempts < 5:
+            while post and (
+                post.id in recent_ids or await has_post_been_sent(ctx.channel.id, post.id)
+            ) and attempts < 5:
                 log.debug("🚫 recently sent, trying another post")
                 try:
                     post = await simple_random_meme(self.reddit, subreddit)
@@ -592,7 +602,7 @@ class Meme(commands.Cog):
                     result.picked_via = "random"
                 attempts += 1
 
-            if not post or post.id in recent_ids:
+            if not post or post.id in recent_ids or await has_post_been_sent(ctx.channel.id, post.id):
                 if await self._try_cache_or_local(ctx, nsfw=sub.over18, keyword=keyword):
                     return
                 if ctx.interaction:

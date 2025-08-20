@@ -10,6 +10,7 @@ __all__ = [
     "close",
     "register_meme_message",
     "get_recent_post_ids",
+    "has_post_been_sent",
 ]
 
 import aiosqlite
@@ -49,6 +50,12 @@ async def init() -> None:
                 post_id      TEXT,
                 timestamp    INTEGER
               )
+            """
+        )
+        await _conn.execute(
+            """
+              CREATE UNIQUE INDEX IF NOT EXISTS idx_channel_post
+              ON meme_messages(channel_id, post_id)
             """
         )
         await _conn.commit()
@@ -101,24 +108,47 @@ def register_meme_message(
     )
 
 
-async def get_recent_post_ids(channel_id: int, limit: int = 20) -> List[str]:
+async def get_recent_post_ids(channel_id: int, limit: Optional[int] = None) -> List[str]:
     """Return recent post IDs for the given channel."""
     if _conn is None:
         raise RuntimeError("Database not initialized")
 
-    async with _conn.execute(
+    query = (
         """
           SELECT post_id
           FROM meme_messages
           WHERE channel_id = ?
           ORDER BY timestamp DESC
-          LIMIT ?
-        """,
-        (channel_id, limit),
-    ) as cursor:
+        """
+    )
+    params: tuple = (channel_id,)
+    if limit is not None:
+        query += " LIMIT ?"
+        params = (channel_id, limit)
+
+    async with _conn.execute(query, params) as cursor:
         rows = await cursor.fetchall()
 
     return [r["post_id"] for r in rows if r["post_id"]]
+
+
+async def has_post_been_sent(channel_id: int, post_id: str) -> bool:
+    """Return True if a post with ``post_id`` was sent in ``channel_id``."""
+    if _conn is None:
+        return False
+
+    async with _conn.execute(
+        """
+          SELECT 1
+          FROM meme_messages
+          WHERE channel_id = ? AND post_id = ?
+          LIMIT 1
+        """,
+        (channel_id, post_id),
+    ) as cursor:
+        row = await cursor.fetchone()
+
+    return row is not None
 
 
 async def _flush_once() -> None:
